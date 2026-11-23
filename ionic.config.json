@@ -1,0 +1,7 @@
+{
+  "name": "autolink-diagnostico",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}

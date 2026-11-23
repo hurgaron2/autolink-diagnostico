@@ -1,0 +1,123 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>USB</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-card>
+    <ion-card-content>
+      <ion-note color="medium">
+        Diagnóstico USB passivo: somente leitura. Este app não abre acessórios, não reivindica
+        interfaces e não envia dados USB. A ausência de visibilidade <strong>não</strong> significa
+        “central desconectada” nem defeito de hardware.
+      </ion-note>
+      <ion-button expand="block" size="large" (click)="enumerar()" [disabled]="enumerando">
+        {{ enumerando ? 'Enumerando…' : 'Reenumerar agora' }}
+      </ion-button>
+      <p *ngIf="snapshot" class="captura">Última enumeração: {{ snapshot.capturadoEm }} (origem: {{ snapshot.origem | origem }})</p>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card *ngIf="vazio">
+    <ion-card-content>
+      <ion-note color="warning" class="mensagem-vazia">
+        Sem dispositivo/acessório visível para este aplicativo.
+      </ion-note>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card *ngIf="snapshot && snapshot.erro">
+    <ion-card-content>
+      <ion-note color="danger">{{ snapshot.erro }}</ion-note>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card *ngIf="snapshot && snapshot.notas.length > 0">
+    <ion-card-content>
+      <ul class="notas">
+        <li *ngFor="let n of snapshot.notas">{{ n }}</li>
+      </ul>
+    </ion-card-content>
+  </ion-card>
+
+  <ng-container *ngIf="snapshot">
+    <ion-card *ngFor="let d of snapshot.dispositivos; trackBy: trackDevice">
+      <ion-card-header>
+        <ion-card-title>
+          Dispositivo USB — VID {{ d.vid }} / PID {{ d.pid }}
+        </ion-card-title>
+        <ion-card-subtitle>
+          {{ d.produto || 'produto sem nome' }} — {{ d.fabricante || 'fabricante não informado' }}
+        </ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list lines="none">
+          <ion-item>
+            <ion-label>Classe / subclasse / protocolo</ion-label>
+            <ion-note slot="end">{{ classeNome(d.classe) }} / {{ d.subclasse }} / {{ d.protocolo }}</ion-note>
+          </ion-item>
+          <ion-item *ngIf="d.versao">
+            <ion-label>Versão do dispositivo</ion-label>
+            <ion-note slot="end">{{ d.versao }}</ion-note>
+          </ion-item>
+          <ion-item>
+            <ion-label>Séries</ion-label>
+            <ion-note slot="end">não coletadas por padrão</ion-note>
+          </ion-item>
+        </ion-list>
+
+        <ion-button fill="outline" expand="block" (click)="alternar(d.key)">
+          {{ expandido === d.key ? 'Ocultar interfaces/endpoints' : 'Ver interfaces e endpoints' }}
+        </ion-button>
+
+        <div *ngIf="expandido === d.key" class="detalhe">
+          <ion-list *ngIf="d.interfaces.length > 0; else semInterfaces" lines="full">
+            <ion-item *ngFor="let i of d.interfaces">
+              <ion-label class="ion-text-wrap">
+                <h3>Interface {{ i.id }} — {{ classeNome(i.classe) }}</h3>
+                <p>subclasse {{ i.subclasse }}, protocolo {{ i.protocolo }}<span *ngIf="i.nome"> — {{ i.nome }}</span></p>
+                <p *ngIf="i.endpoints.length === 0">nenhum endpoint exposto</p>
+                <p *ngFor="let e of i.endpoints" class="endpoint">
+                  endpoint 0x{{ e.address.toString(16) }} — {{ e.direcao }}, {{ e.tipo }},
+                  pacote máx {{ e.maxPacketSize }} B<ng-container *ngIf="e.interval">, intervalo {{ e.interval }}</ng-container>
+                </p>
+              </ion-label>
+            </ion-item>
+          </ion-list>
+          <ng-template #semInterfaces>
+            <ion-note color="medium">Nenhuma interface visível para este aplicativo.</ion-note>
+          </ng-template>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card *ngFor="let a of snapshot.acessorios; trackBy: trackAccessory">
+      <ion-card-header>
+        <ion-card-title>Acessório USB</ion-card-title>
+        <ion-card-subtitle>{{ a.modelo || 'modelo não informado' }}</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list lines="none">
+          <ion-item>
+            <ion-label>Fabricante</ion-label>
+            <ion-note slot="end">{{ a.fabricante || '—' }}</ion-note>
+          </ion-item>
+          <ion-item>
+            <ion-label>Descrição</ion-label>
+            <ion-note slot="end">{{ a.descricao || '—' }}</ion-note>
+          </ion-item>
+          <ion-item>
+            <ion-label>Versão</ion-label>
+            <ion-note slot="end">{{ a.versao || '—' }}</ion-note>
+          </ion-item>
+          <ion-item>
+            <ion-label>URI</ion-label>
+            <ion-note slot="end">{{ a.uri || '—' }}</ion-note>
+          </ion-item>
+        </ion-list>
+        <ion-note color="medium">Acessório não foi aberto — apenas listado.</ion-note>
+      </ion-card-content>
+    </ion-card>
+  </ng-container>
+</ion-content>

@@ -1,0 +1,67 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Visão geral</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Status da coleta</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <p>
+        <strong>Sessão:</strong>
+        {{ sessaoAtiva ? 'ativa desde ' + sessaoAtiva.iniciadaEm : 'não iniciada' }}
+      </p>
+      <p><strong>USB:</strong> {{ resumoUsb }}</p>
+      <p><strong>Logs importados:</strong> {{ logs.logs.length }}</p>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Painel do telefone</ion-card-title>
+      <ion-card-subtitle *ngIf="ultimaColeta">Última coleta: {{ ultimaColeta }}</ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-button expand="block" size="large" (click)="atualizar()" [disabled]="carregando">
+        {{ carregando ? 'Coletando…' : 'Atualizar coleta' }}
+      </ion-button>
+
+      <ion-note *ngIf="aviso" color="warning" class="aviso">{{ aviso }}</ion-note>
+
+      <ion-list *ngIf="linhas.length > 0; else semDados" lines="full">
+        <ion-item *ngFor="let linha of linhas">
+          <ion-label class="ion-text-wrap">
+            <h3>{{ linha.rotulo }}</h3>
+            <p *ngIf="linha.detalhe">{{ linha.detalhe }}</p>
+          </ion-label>
+          <ion-note slot="end" class="ion-text-end">
+            <strong>{{ linha.valor }}</strong><br />
+            <span class="badge-origem">{{ linha.origem | origem }}</span>
+          </ion-note>
+        </ion-item>
+      </ion-list>
+
+      <ng-template #semDados>
+        <ion-note color="medium">Nenhum dado coletado ainda — toque em “Atualizar coleta”.</ion-note>
+      </ng-template>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Limitações desta coleta</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ul class="lista-limitacoes">
+        <li>Sem root, o app não lê logs de outros aplicativos — só importa arquivos que você obtiver (ADB, relatório de bugs).</li>
+        <li>Sem filtros USB no manifest: o app só observa e não disputa o Android Auto.</li>
+        <li>Não se presume que a central seja Android, tenha ADB ou que o telefone seja o host USB.</li>
+        <li>Versões da central/adaptador são informadas manualmente e não são lidas por USB.</li>
+        <li>Não verificamos firmware da central nem fizemos nenhuma tentativa de atualização.</li>
+      </ul>
+    </ion-card-content>
+  </ion-card>
+</ion-content>

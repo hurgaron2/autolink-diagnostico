@@ -1,0 +1,141 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Logs importados</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Logs internos do aplicativo</ion-card-title>
+      <ion-card-subtitle>Gerados por este app — não são logs do sistema</ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <pre class="log-interno">{{ internos.join('\n') }}</pre>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Importar arquivo</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-note color="warning" class="aviso">
+        Logs e relatórios de bugs podem conter dados pessoais. Nada é enviado para servidores:
+        a análise acontece só neste aparelho, e os arquivos brutos ficam privados até você
+        excluí-los ou exportá-los explicitamente.
+      </ion-note>
+
+      <ion-item lines="none">
+        <ion-label>Logcat em TXT</ion-label>
+        <input
+          slot="end"
+          type="file"
+          accept=".txt,.log,text/plain"
+          multiple
+          (change)="onArquivo($event)"
+          [disabled]="processando"
+        />
+      </ion-item>
+      <ion-item lines="none">
+        <ion-label>Relatório de bugs em ZIP</ion-label>
+        <input
+          slot="end"
+          type="file"
+          accept=".zip,application/zip"
+          (change)="onArquivo($event)"
+          [disabled]="processando"
+        />
+      </ion-item>
+      <p class="dica">
+        Sem botão de “coleta automática”: este app não tem privilégio de ler o log do sistema.
+        Gere o log por ADB (script PowerShell) ou pelas opções do desenvolvedor do Android e
+        importe aqui.
+      </p>
+
+      <ion-note *ngIf="processando" color="primary">Processando…</ion-note>
+      <ion-note *ngIf="mensagem" color="success" class="bloco">{{ mensagem }}</ion-note>
+      <ion-note *ngIf="erro" color="danger" class="bloco">{{ erro }}</ion-note>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Arquivos importados</ion-card-title>
+      <ion-card-subtitle>{{ logs.logs.length }} arquivo(s) — selecione quais levar no export</ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-note *ngIf="logs.logs.length === 0" color="medium">Nenhum log importado ainda.</ion-note>
+      <ion-list lines="full">
+        <ion-item *ngFor="let l of logs.logs; trackBy: trackLog">
+          <ion-label class="ion-text-wrap">
+            <h3>{{ l.nome }}</h3>
+            <p>
+              {{ l.origemArquivo === 'logcat_txt' ? 'logcat TXT' : 'relatório ZIP' }} —
+              {{ l.linhas }} linha(s) — importado {{ l.importadoEm }} —
+              armazenado: {{ l.armazenadoEm }}
+            </p>
+          </ion-label>
+          <ion-checkbox
+            slot="end"
+            [checked]="l.incluirNaExportacao"
+            (ionChange)="alternarInclusao(l.id)"
+            labelPlacement="start"
+            aria-label="Incluir no export"
+          ></ion-checkbox>
+          <ion-button slot="end" fill="clear" color="danger" (click)="excluir(l)">
+            <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+          </ion-button>
+        </ion-item>
+      </ion-list>
+      <ion-button
+        expand="block"
+        size="large"
+        [disabled]="logs.logs.length === 0 || analisando"
+        (click)="analisar()"
+      >
+        {{ analisando ? 'Analisando…' : 'Analisar termos (local)' }}
+      </ion-button>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card *ngIf="logs.analiseConcluida">
+    <ion-card-header>
+      <ion-card-title>Análise (evidência, não diagnóstico)</ion-card-title>
+      <ion-card-subtitle>
+        A ocorrência de um termo não prova a causa do erro 7.
+      </ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-note *ngIf="logs.avisoAnalise" color="warning" class="bloco">{{ logs.avisoAnalise }}</ion-note>
+
+      <p *ngIf="resumoTermos.length > 0">
+        <ion-chip *ngFor="let t of resumoTermos" color="primary">
+          {{ t.termo }}: {{ t.total }}
+        </ion-chip>
+      </p>
+
+      <ion-card *ngFor="let m of matchesExibidos; trackBy: trackMatch" class="match">
+        <ion-card-header>
+          <ion-card-subtitle>
+            {{ m.arquivo }} — linha {{ m.linha }}
+            <span *ngIf="m.timestamp"> — {{ m.timestamp }}</span>
+            <span *ngIf="m.tag"> — tag {{ m.tag }}</span>
+            — termo: <strong>{{ m.termo }}</strong>
+          </ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+          <pre class="trecho">{{ m.trecho }}</pre>
+          <p class="rotulo-contexto">Linhas vizinhas:</p>
+          <pre class="contexto" *ngIf="m.contexto.length > 0; else semContexto"><ng-container *ngFor="let c of m.contexto">#{{ c.num }} {{ c.texto }}
+</ng-container></pre>
+          <ng-template #semContexto><p class="rotulo-contexto">Sem linhas vizinhas no arquivo.</p></ng-template>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-note *ngIf="logs.matches.length > matchesExibidos.length" color="medium">
+        Mostrando {{ matchesExibidos.length }} de {{ logs.matches.length }} ocorrências.
+      </ion-note>
+    </ion-card-content>
+  </ion-card>
+</ion-content>

@@ -1,0 +1,105 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Relatório e exportação</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Dados da central (manual)</ion-card-title>
+      <ion-card-subtitle>
+        Origem: informado pelo usuário — <strong>não confirmado por USB</strong>. Nenhuma leitura
+        de firmware é implementada nesta etapa.
+      </ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-list lines="full">
+        <ion-item>
+          <ion-input label="Modelo da central" labelPlacement="stacked" [(ngModel)]="modelo"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input label="APP (transcrito de foto — não confirmado)" labelPlacement="stacked" [(ngModel)]="app"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input label="cfg" labelPlacement="stacked" [(ngModel)]="cfg"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input label="MCU" labelPlacement="stacked" [(ngModel)]="mcu"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input label="IC" labelPlacement="stacked" [(ngModel)]="ic"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input label="Radio" labelPlacement="stacked" [(ngModel)]="radio"></ion-input>
+        </ion-item>
+      </ion-list>
+
+      <ion-list lines="full">
+        <ion-item>
+          <ion-input label="Adaptador — modelo" labelPlacement="stacked" [(ngModel)]="adaptadorModelo"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input label="Adaptador — APP" labelPlacement="stacked" [(ngModel)]="adaptadorApp"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input label="Adaptador — System" labelPlacement="stacked" [(ngModel)]="adaptadorSystem"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input label="Adaptador — BT" labelPlacement="stacked" [(ngModel)]="adaptadorBt"></ion-input>
+        </ion-item>
+      </ion-list>
+
+      <ion-button expand="block" size="large" (click)="salvarCentral()">Salvar dados da central</ion-button>
+      <ion-button expand="block" fill="outline" (click)="restaurarPadrao()">Restaurar valores padrão</ion-button>
+
+      <ion-item lines="none">
+        <ion-label>Foto opcional da etiqueta</ion-label>
+        <input slot="end" type="file" accept="image/*" (change)="onFoto($event)" />
+      </ion-item>
+      <ion-note *ngIf="central.foto" color="medium">
+        Foto anexada: {{ central.fotoNome }} (cópia local privada)
+      </ion-note>
+
+      <ion-note *ngIf="mensagem" color="success" class="bloco">{{ mensagem }}</ion-note>
+      <ion-note *ngIf="erro" color="danger" class="bloco">{{ erro }}</ion-note>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Exportar pacote de diagnóstico</ion-card-title>
+      <ion-card-subtitle>
+        ZIP local compartilhado por ação sua — sem servidor, sem analytics, sem upload automático.
+      </ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-list>
+        <ion-item>
+          <ion-toggle [(ngModel)]="incluirLogs" labelPlacement="start">
+            Incluir logs importados selecionados
+          </ion-toggle>
+        </ion-item>
+        <ion-item>
+          <ion-toggle [(ngModel)]="sanitizar" labelPlacement="start">
+            Ocultar identificadores (sanitização — não é perfeita)
+          </ion-toggle>
+        </ion-item>
+      </ion-list>
+
+      <ion-note *ngIf="!sanitizar" color="danger" class="bloco">
+        Você optou por exportar SEM sanitização: os logs podem conter dados pessoais.
+      </ion-note>
+
+      <ion-button expand="block" size="large" color="primary" [disabled]="gerando" (click)="gerar()">
+        {{ gerando ? 'Gerando…' : 'Gerar e compartilhar ZIP' }}
+      </ion-button>
+
+      <ion-note color="medium" class="bloco">
+        O pacote contém: manifest.json (versão do esquema), device.json, central.json,
+        usb-snapshots.json, timeline.json, app-events.txt, resumo.txt e — apenas se marcado —
+        os logs importados. Os arquivos brutos permanecem privados até você exportar ou excluí-los.
+      </ion-note>
+    </ion-card-content>
+  </ion-card>
+</ion-content>
