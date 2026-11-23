@@ -1,0 +1,79 @@
+.tela-inicial {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+  text-align: center;
+  max-width: 480px;
+  margin: 0 auto;
+  padding-top: 24px;
+}
+
+.titulo-app {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--ion-color-primary);
+  margin: 0;
+  margin-top: 16px;
+}
+
+.descricao {
+  font-size: 16px;
+  color: var(--ion-color-medium);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.bloco-ultimo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--ion-color-step-200);
+  border-radius: 12px;
+  background: var(--ion-color-light);
+}
+
+.titulo-secao {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--ion-color-dark);
+}
+
+.dado {
+  font-size: 14px;
+  color: var(--ion-color-medium);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.aviso-erro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--ion-color-danger);
+  border-radius: 12px;
+  background: rgba(var(--ion-color-danger-rgb, 197, 0, 15), 0.1);
+  color: var(--ion-color-danger);
+}
+
+.orientacao {
+  font-size: 14px;
+  color: var(--ion-color-medium);
+  margin-top: 8px;
+}
+
+ion-button {
+  width: 100%;
+  min-height: 56px;
+  font-size: 16px;
+  font-weight: 600;
+}

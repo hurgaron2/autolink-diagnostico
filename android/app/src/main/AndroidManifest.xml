@@ -38,11 +38,28 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- USB público — observação somente leitura, sem abrir acessório nem reivindicar interface. -->
+    <uses-permission android:name="android.permission.USB_PERMISSION" />
+
+    <!-- Bluetooth — apenas leitura de estado/vínculo, sem descoberta contínua desnecessária. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
+    <!-- Notificação visível, caso um serviço em primeiro plano seja necessário para captura contínua. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <!--
       Consultas pontuais (PackageManager). Sem QUERY_ALL_PACKAGES.
       Nao ha filtros de intent USB/USB_ACCESSORY aqui de proposito: o app
       apenas observa e nao disputa a deteccao de acessorio com o Android Auto.
+      Armazenamento publico (Downloads/AutoLinkDiagnostico) usa scoped storage
+      (MediaStore/SAF) — nao e necessario WRITE_EXTERNAL_STORAGE nem MANAGE_EXTERNAL_STORAGE.
     -->
     <queries>
         <package android:name="com.google.android.gms" />

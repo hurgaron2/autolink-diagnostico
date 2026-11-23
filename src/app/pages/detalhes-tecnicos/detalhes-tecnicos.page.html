@@ -1,0 +1,146 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Detalhes técnicos</ion-title>
+    <ion-buttons slot="start">
+      <ion-back-button></ion-back-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-accordion-group>
+    <!-- Telefone -->
+    <ion-accordion value="telefone" [disabled]="telefones.length === 0 && pacotes.length === 0">
+      <div slot="header">
+        <ion-label>Telefone</ion-label>
+      </div>
+      <div slot="content" class="conteudo-secao">
+        <ion-list lines="none">
+          <ion-item *ngFor="let c of telefones">
+            <ion-label>{{ c.label }}</ion-label>
+            <ion-note slot="end">{{ c.valor }}</ion-note>
+            <ion-badge slot="end" color="medium" size="small">{{ origemLabel(c.origem) }}</ion-badge>
+          </ion-item>
+          <ion-item *ngFor="let c of pacotes">
+            <ion-label>{{ c.label }}</ion-label>
+            <ion-note slot="end">{{ c.valor }}</ion-note>
+            <ion-badge slot="end" color="medium" size="small">{{ origemLabel(c.origem) }}</ion-badge>
+          </ion-item>
+        </ion-list>
+      </div>
+    </ion-accordion>
+
+    <!-- Equipamentos detectados -->
+    <ion-accordion value="equipamentos" [disabled]="identificacao.equipamentos.length === 0">
+      <div slot="header">
+        <ion-label>Equipamentos detectados</ion-label>
+      </div>
+      <div slot="content" class="conteudo-secao">
+        <ion-list lines="full">
+          <ion-item *ngFor="let e of identificacao.equipamentos">
+            <ion-label class="ion-text-wrap">
+              <h3>{{ e.tipo === 'usb_dispositivo' ? 'USB' : e.tipo === 'usb_acessorio' ? 'Acessório USB' : e.tipo }}</h3>
+              <p>{{ e.detalhe }}</p>
+              <p *ngIf="e.valor && e.valor.produto">{{ e.valor.produto }}</p>
+            </ion-label>
+            <ion-badge slot="end" color="medium" size="small">{{ evidenciaLabel(e.evidencia) }}</ion-badge>
+          </ion-item>
+          <ion-item *ngIf="identificacao.equipamentos.length === 0">
+            <ion-label>Nenhum equipamento detectado.</ion-label>
+          </ion-item>
+        </ion-list>
+      </div>
+    </ion-accordion>
+
+    <!-- Conexões -->
+    <ion-accordion value="conexoes" [disabled]="eventos.length === 0">
+      <div slot="header">
+        <ion-label>Conexões observadas</ion-label>
+      </div>
+      <div slot="content" class="conteudo-secao">
+        <ion-list lines="full">
+          <ion-item *ngFor="let e of eventos; trackBy: trackById">
+            <ion-label class="ion-text-wrap">
+              <h3>{{ e.rotulo }}</h3>
+              <p>{{ e.timestampIso }} — fuso UTC{{ e.timezoneOffsetMin >= 0 ? '+' : '' }}{{ e.timezoneOffsetMin / 60 }}h</p>
+              <p *ngIf="e.detalhe">{{ e.detalhe }}</p>
+            </ion-label>
+            <ion-badge slot="end" color="medium" size="small">{{ e.tipo }}</ion-badge>
+          </ion-item>
+          <ion-item *ngIf="eventos.length === 0">
+            <ion-label>Nenhuma conexão observada.</ion-label>
+          </ion-item>
+        </ion-list>
+      </div>
+    </ion-accordion>
+
+    <!-- Eventos e logs -->
+    <ion-accordion value="eventos">
+      <div slot="header">
+        <ion-label>Eventos e logs</ion-label>
+      </div>
+      <div slot="content" class="conteudo-secao">
+        <ion-list lines="full">
+          <ion-item *ngFor="let e of eventos; trackBy: trackById">
+            <ion-label class="ion-text-wrap">
+              <h3>{{ e.rotulo }}</h3>
+              <p>{{ e.timestampIso }}</p>
+              <p [innerHTML]="e.detalhe ? e.detalhe : ''"></p>
+              <ion-badge [color]="corOrigem(e.origem)" slot="start">{{ e.origem }}</ion-badge>
+              <ion-badge color="medium" slot="end">mono {{ e.monotonicMs }} ms</ion-badge>
+            </ion-label>
+          </ion-item>
+          <ion-item *ngIf="eventos.length === 0">
+            <ion-label>Nenhum evento registrado.</ion-label>
+          </ion-item>
+        </ion-list>
+
+        <div class="botoes-acao">
+          <ion-button expand="block" fill="outline" size="small" (click)="copiarEventos()">
+            Copiar logs
+          </ion-button>
+          <ion-button expand="block" fill="outline" size="small" (click)="compartilharArquivos()">
+            Compartilhar detalhes
+          </ion-button>
+        </div>
+      </div>
+    </ion-accordion>
+
+    <!-- Cobertura e limitações -->
+    <ion-accordion value="cobertura">
+      <div slot="header">
+        <ion-label>Cobertura e limitações da coleta</ion-label>
+      </div>
+      <div slot="content" class="conteudo-secao">
+        <ion-list lines="none">
+          <ion-item>
+            <ion-label>Logs internos do Android Auto</ion-label>
+            <ion-badge slot="end" color="medium">Não acessível neste modo</ion-badge>
+          </ion-item>
+          <ion-item>
+            <ion-label>Bluetooth / Wi-Fi / rede</ion-label>
+            <ion-badge slot="end" color="medium">Não exposto pelo plugin atual</ion-badge>
+          </ion-item>
+          <ion-item>
+            <ion-label>Firmware da central</ion-label>
+            <ion-badge slot="end" color="medium">Não lido por USB</ion-badge>
+          </ion-item>
+          <ion-item>
+            <ion-label>Presença USB = central confirmada</ion-label>
+            <ion-badge slot="end" color="danger">Não confirmado</ion-badge>
+          </ion-item>
+        </ion-list>
+        <ion-note color="medium">
+          A presença de um dispositivo USB não confirma que é a central de destino.
+          A ausência de visibilidade USB não significa defeito de hardware.
+        </ion-note>
+      </div>
+    </ion-accordion>
+  </ion-accordion-group>
+
+  <div class="botoes-inferior">
+    <ion-button expand="block" fill="outline" color="medium" (click)="novoDiagnostico()">
+      Novo diagnóstico
+    </ion-button>
+  </div>
+</ion-content>

@@ -1,0 +1,46 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Sobre</ion-title>
+    <ion-buttons slot="start">
+      <ion-back-button></ion-back-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>AutoLink Diagnóstico</ion-card-title>
+      <ion-card-subtitle>Versão 1.2</ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <p>
+        Aplicativo de diagnóstico de conexão para celulares Android. Registra eventos de
+        conexão (USB, Bluetooth, rede) observados por APIs públicas, sem acessar dados
+        privados de outros aplicativos.
+      </p>
+      <p>
+        <strong>O que este app faz:</strong>
+      </p>
+      <ul>
+        <li>Registra conexões USB observadas (somente leitura)</li>
+        <li>Registra mudanças de conexão durante o diagnóstico</li>
+        <li>Gera relatórios para compartilhamento</li>
+        <li>Não lê logs privados de outros aplicativos</li>
+        <li>Não acessa firmware da central</li>
+        <li>Não disputa o Android Auto</li>
+      </ul>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-list lines="none">
+    <ion-item>
+      <ion-label>Versão do aplicativo</ion-label>
+      <ion-note slot="end">1.2</ion-note>
+    </ion-item>
+    <ion-item>
+      <ion-label>applicationId</ion-label>
+      <ion-note slot="end">com.autolink.diagnostico</ion-note>
+    </ion-item>
+  </ion-list>
+</ion-content>

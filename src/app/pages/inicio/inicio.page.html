@@ -1,0 +1,53 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Diagnóstico da conexão</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="tela-inicial">
+    <h1 class="titulo-app">AutoLink Diagnóstico</h1>
+
+    <p class="descricao">
+      Registre o que acontece ao conectar seu celular ao carro.
+    </p>
+
+    <!-- Último diagnóstico (secundário, só quando existir) -->
+    <div *ngIf="temUltimoDiagnostico" class="bloco-ultimo">
+      <h2 class="titulo-secao">Último diagnóstico</h2>
+      <p class="dado">{{ ultimoDiagnosticoFormatado }}</p>
+      <ion-button expand="block" (click)="continuarDiagnostico()">
+        Continuar diagnóstico
+      </ion-button>
+    </div>
+
+    <!-- Aviso acionável somente quando houver algo que impeça ou limite -->
+    <div *ngIf="diagnostico.erro" class="aviso-erro">
+      <strong>Não foi possível iniciar o diagnóstico anterior:</strong>
+      {{ diagnostico.erro }}
+      <ion-button fill="clear" color="danger" size="small" (click)="diagnostico.erro = null">
+        Dispensar
+      </ion-button>
+    </div>
+
+    <!-- Botão principal -->
+    <ion-button
+      expand="block"
+      size="large"
+      shape="round"
+      [disabled]="diagnostico.processando || temUltimoDiagnostico"
+      (click)="iniciarDiagnostico()"
+    >
+      {{ diagnostico.processando ? 'Iniciando…' : 'Iniciar diagnóstico' }}
+    </ion-button>
+
+    <p class="orientacao">
+      Inicie antes de conectar o celular à central.
+    </p>
+
+    <!-- Acesso a "Como usar" -->
+    <ion-button expand="block" fill="outline" size="small" [routerLink]="['/ajustes']">
+      Como usar
+    </ion-button>
+  </div>
+</ion-content>

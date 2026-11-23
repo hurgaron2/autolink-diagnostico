@@ -1,0 +1,54 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Ajustes</ion-title>
+    <ion-buttons slot="start">
+      <ion-back-button></ion-back-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-list lines="full">
+    <!-- Pasta dos diagnósticos -->
+    <ion-item button detail="true">
+      <ion-label>
+        <h2>Pasta dos diagnósticos</h2>
+        <p>Onde os relatórios são salvos</p>
+      </ion-label>
+      <ion-icon slot="end" name="folder-outline"></ion-icon>
+    </ion-item>
+
+    <!-- Privacidade -->
+    <ion-item button detail="false">
+      <ion-label>
+        <h2>Ocultar identificadores</h2>
+        <p>Sanitizar dados antes de compartilhar</p>
+      </ion-label>
+      <ion-toggle slot="end" [(ngModel)]="sanitizar" (ionChange)="alternarSanitizacao()"></ion-toggle>
+    </ion-item>
+
+    <!-- Como usar -->
+    <ion-item button detail="true" (click)="irComoUsar()">
+      <ion-label>
+        <h2>Como usar</h2>
+        <p>Passo a passo para fazer um diagnóstico</p>
+      </ion-label>
+      <ion-icon slot="end" name="help-circle-outline"></ion-icon>
+    </ion-item>
+
+    <!-- Sobre -->
+    <ion-item button detail="true" (click)="irSobre()">
+      <ion-label>
+        <h2>Sobre o aplicativo</h2>
+        <p>Versão {{ versao }}</p>
+      </ion-label>
+      <ion-icon slot="end" name="information-circle-outline"></ion-icon>
+    </ion-item>
+  </ion-list>
+
+  <ion-note color="medium">
+    Este aplicativo registra eventos de conexão (USB, Bluetooth, rede) observados
+    por APIs públicas. Não lê logs privados de outros aplicativos, não acessa
+    firmware da central e não disputa o Android Auto.
+  </ion-note>
+</ion-content>

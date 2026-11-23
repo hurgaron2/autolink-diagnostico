@@ -1,0 +1,127 @@
+.tela-diagnostico {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 480px;
+  margin: 0 auto;
+  padding-top: 20px;
+}
+
+.estado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ion-color-step-200);
+  border-radius: 12px;
+  background: var(--ion-color-light);
+}
+
+.icone-estado {
+  font-size: 32px;
+  color: var(--ion-color-primary);
+}
+
+.estado h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+}
+
+.estado p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--ion-color-medium);
+}
+
+.orientacao {
+  padding: 16px;
+  border: 1px solid var(--ion-color-step-200);
+  border-radius: 12px;
+  background: var(--ion-color-light);
+}
+
+.orientacao h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+}
+
+.orientacao p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ion-color-medium);
+  line-height: 1.5;
+}
+
+.resumo-conexoes {
+  padding: 16px;
+  border: 1px solid var(--ion-color-step-200);
+  border-radius: 12px;
+  background: var(--ion-color-light);
+}
+
+.resumo-conexoes h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+}
+
+.item-conexao {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ion-color-step-100);
+}
+
+.item-conexao:last-child {
+  border-bottom: none;
+}
+
+.item-conexao .label {
+  font-size: 14px;
+  color: var(--ion-color-medium);
+}
+
+.item-conexao .valor {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ion-color-dark);
+}
+
+.aviso-limitacao {
+  padding: 16px;
+  border: 1px solid var(--ion-color-step-200);
+  border-radius: 12px;
+  background: var(--ion-color-light);
+}
+
+.aviso-limitacao p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--ion-color-medium);
+  line-height: 1.5;
+}
+
+.aviso-falha {
+  padding: 16px;
+  border: 1px solid var(--ion-color-warning);
+  border-radius: 12px;
+  background: rgba(var(--ion-color-warning-rgb, 255, 196, 9), 0.1);
+  color: var(--ion-color-warning);
+}
+
+.aviso-falha p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+ion-button {
+  min-height: 56px;
+  font-size: 16px;
+  font-weight: 600;
+}

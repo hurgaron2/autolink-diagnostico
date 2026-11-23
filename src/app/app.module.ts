@@ -7,25 +7,33 @@ import { IonicModule, IonicRouteStrategy } from '@ionic/angular/lazy';
 
 import { AppComponent } from './app.component';
 import { AppRoutingModule } from './app-routing.module';
-import { VisaoGeralPage } from './pages/visao-geral/visao-geral.page';
-import { UsbPage } from './pages/usb/usb.page';
-import { SessaoPage } from './pages/sessao/sessao.page';
-import { LogsPage } from './pages/logs/logs.page';
-import { RelatorioPage } from './pages/relatorio/relatorio.page';
-import { OrigemPipe } from './shared/origem.pipe';
+import { InicioPage } from './pages/inicio/inicio.page';
+import { HistoricoPage } from './pages/historico/historico.page';
+import { AjustesPage } from './pages/ajustes/ajustes.page';
+import { ComoUsarPage } from './pages/ajustes/como-usar.page';
+import { SobrePage } from './pages/ajustes/sobre.page';
+import { DiagnosticoPage } from './pages/diagnostico/diagnostico.page';
+import { ResultadoPage } from './pages/resultado/resultado.page';
+import { DetalhesTecnicosPage } from './pages/detalhes-tecnicos/detalhes-tecnicos.page';
+import { DiagnosticoService } from './core/diagnostico.service';
 
 @NgModule({
   declarations: [
     AppComponent,
-    VisaoGeralPage,
-    UsbPage,
-    SessaoPage,
-    LogsPage,
-    RelatorioPage,
-    OrigemPipe,
+    InicioPage,
+    HistoricoPage,
+    AjustesPage,
+    ComoUsarPage,
+    SobrePage,
+    DiagnosticoPage,
+    ResultadoPage,
+    DetalhesTecnicosPage,
   ],
   imports: [BrowserModule, FormsModule, IonicModule.forRoot(), AppRoutingModule],
-  providers: [{ provide: RouteReuseStrategy, useClass: IonicRouteStrategy }],
+  providers: [
+    { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
+    DiagnosticoService,
+  ],
   bootstrap: [AppComponent],
 })
 export class AppModule {}

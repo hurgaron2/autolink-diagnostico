@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { ExportService } from './export.service';
 import { LogImportService } from './log-import.service';
 import { StorageService } from './storage.service';
+import { IdentificacaoService } from './identificacao.service';
 
 describe('ExportService', () => {
   let service: ExportService;
@@ -119,5 +120,44 @@ describe('ExportService', () => {
     const { avisos } = await service.construirArquivos({ incluirLogs: false, sanitizar: true });
     expect(avisos.some((a) => a.includes('Nenhuma sessão'))).toBe(true);
     expect(avisos.some((a) => a.includes('Nenhuma enumeração USB'))).toBe(true);
+  });
+
+  it('inclui detected-equipment.json com equipamentos observados', async () => {
+    const identificacao = TestBed.inject(IdentificacaoService);
+    identificacao.registrarUsbDispositivo({
+      key: 'vid:111:pid:222',
+      vid: 111,
+      pid: 222,
+      classe: 0,
+      subclasse: 0,
+      protocolo: 0,
+      fabricante: 'Fab',
+      produto: 'Prod',
+      versao: '1.0',
+      serial: null,
+      interfaces: [],
+    });
+    const { arquivos } = await service.construirArquivos({ incluirLogs: false, sanitizar: true });
+    const equip = JSON.parse(arquivos['detected-equipment.json']) as {
+      equipamentos: Array<{ tipo: string; origem: string; evidencia: string }>;
+    };
+    expect(equip.equipamentos.length).toBe(1);
+    expect(equip.equipamentos[0].tipo).toBe('usb_dispositivo');
+    expect(equip.equipamentos[0].origem).toBe('api');
+    expect(equip.equipamentos[0].evidencia).toBe('observado');
+  });
+
+  it('inclui conexões.jsonl com eventos de conexão da sessão', async () => {
+    const { arquivos } = await service.construirArquivos({ incluirLogs: false, sanitizar: true });
+    // conexoes.jsonl sempre deve estar presente (vazio se não houver eventos)
+    expect(arquivos['conexoes.jsonl']).toBeDefined();
+    expect(typeof arquivos['conexoes.jsonl']).toBe('string');
+  });
+
+  it('manifesto lista detected-equipment.json e conexões.jsonl', async () => {
+    const { arquivos } = await service.construirArquivos({ incluirLogs: false, sanitizar: true });
+    const manifest = JSON.parse(arquivos['manifest.json']) as { arquivos: string[] };
+    expect(manifest.arquivos).toContain('detected-equipment.json');
+    expect(manifest.arquivos).toContain('conexoes.jsonl');
   });
 });

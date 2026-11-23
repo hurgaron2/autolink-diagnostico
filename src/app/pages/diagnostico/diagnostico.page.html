@@ -1,0 +1,76 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Diagnóstico em andamento</ion-title>
+    <ion-buttons slot="start">
+      <ion-back-button></ion-back-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="tela-diagnostico">
+    <!-- Estado -->
+    <div class="estado">
+      <ion-icon name="pulse-outline" class="icone-estado"></ion-icon>
+      <div>
+        <h2>Registrando diagnóstico</h2>
+        <p>{{ tempoDecorrido }} decorridos · {{ eventosConexao }} evento(s) de conexão</p>
+      </div>
+    </div>
+
+    <!-- Orientação -->
+    <div class="orientacao">
+      <h3>O que fazer agora</h3>
+      <p>{{ orientacao }}</p>
+    </div>
+
+    <!-- Resumo simples de conexões -->
+    <div class="resumo-conexoes">
+      <h3>Conexões observadas</h3>
+      <div class="item-conexao">
+        <span class="label">USB</span>
+        <span class="valor">{{ eventosConexao > 0 ? 'Conexão observada' : 'Sem conexão observada' }}</span>
+      </div>
+      <div class="item-conexao">
+        <span class="label">Bluetooth</span>
+        <span class="valor">Informação indisponível</span>
+      </div>
+      <div class="item-conexao">
+        <span class="label">Wi-Fi / rede</span>
+        <span class="valor">Informação indisponível</span>
+      </div>
+    </div>
+
+    <!-- Aviso de limitação -->
+    <div class="aviso-limitacao">
+      <p>
+        Este modo registra as conexões, mas não consegue ler os registros internos do Android Auto.
+      </p>
+      <ion-button fill="clear" color="primary" size="small" [routerLink]="['/ajustes/como-usar']">
+        Saiba mais
+      </ion-button>
+    </div>
+
+    <!-- Falha na coleta -->
+    <div *ngIf="temFalhaColeta" class="aviso-falha">
+      <p><strong>Falha na coleta:</strong> Alguma fonte de observação não pôde ser acessada. O diagnóstico continua com os dados disponíveis.</p>
+    </div>
+
+    <!-- Botão principal -->
+    <ion-button
+      expand="block"
+      size="large"
+      shape="round"
+      color="danger"
+      [disabled]="diagnostico.processando"
+      (click)="encerrarDiagnostico()"
+    >
+      {{ diagnostico.processando ? 'Encerrando…' : 'Encerrar diagnóstico' }}
+    </ion-button>
+
+    <!-- Link secundário -->
+    <ion-button expand="block" fill="outline" size="small" (click)="verDetalhesTecnicos()">
+      Ver detalhes técnicos
+    </ion-button>
+  </div>
+</ion-content>

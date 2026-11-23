@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.autolink.diagnostico',
-  appName: 'autolink-diagnostico',
+  appName: 'Diagnóstico de Conexão',
   webDir: 'www'
 };
 

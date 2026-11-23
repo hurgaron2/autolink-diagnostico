@@ -108,7 +108,9 @@ export type EventoTipo =
   | 'lacuna_fim'
   | 'sessao_encerrada'
   | 'erro_coleta'
-  | 'app_evento';
+  | 'app_evento'
+  | 'diagnostico_iniciado'
+  | 'diagnostico_encerrado';
 
 export interface Evento {
   id: string;

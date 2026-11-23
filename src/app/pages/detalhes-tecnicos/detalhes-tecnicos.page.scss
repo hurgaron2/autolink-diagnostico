@@ -1,0 +1,27 @@
+.conteudo-secao {
+  padding: 12px 0;
+}
+
+.botoes-acao {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+ion-item {
+  --min-height: 48px;
+}
+
+.botoes-inferior {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+ion-button {
+  min-height: 56px;
+  font-size: 16px;
+  font-weight: 600;
+}

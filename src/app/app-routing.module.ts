@@ -1,19 +1,25 @@
 import { NgModule } from '@angular/core';
 import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
-import { VisaoGeralPage } from './pages/visao-geral/visao-geral.page';
-import { UsbPage } from './pages/usb/usb.page';
-import { SessaoPage } from './pages/sessao/sessao.page';
-import { LogsPage } from './pages/logs/logs.page';
-import { RelatorioPage } from './pages/relatorio/relatorio.page';
+import { InicioPage } from './pages/inicio/inicio.page';
+import { HistoricoPage } from './pages/historico/historico.page';
+import { AjustesPage } from './pages/ajustes/ajustes.page';
+import { ComoUsarPage } from './pages/ajustes/como-usar.page';
+import { SobrePage } from './pages/ajustes/sobre.page';
+import { DiagnosticoPage } from './pages/diagnostico/diagnostico.page';
+import { ResultadoPage } from './pages/resultado/resultado.page';
+import { DetalhesTecnicosPage } from './pages/detalhes-tecnicos/detalhes-tecnicos.page';
 
 const routes: Routes = [
-  { path: '', redirectTo: 'visao-geral', pathMatch: 'full' },
-  { path: 'visao-geral', component: VisaoGeralPage },
-  { path: 'usb', component: UsbPage },
-  { path: 'sessao', component: SessaoPage },
-  { path: 'logs', component: LogsPage },
-  { path: 'relatorio', component: RelatorioPage },
-  { path: '**', redirectTo: 'visao-geral' },
+  { path: '', redirectTo: 'inicio', pathMatch: 'full' },
+  { path: 'inicio', component: InicioPage },
+  { path: 'historico', component: HistoricoPage },
+  { path: 'ajustes', component: AjustesPage },
+  { path: 'ajustes/como-usar', component: ComoUsarPage },
+  { path: 'ajustes/sobre', component: SobrePage },
+  { path: 'diagnostico', component: DiagnosticoPage },
+  { path: 'resultado/:id', component: ResultadoPage },
+  { path: 'detalhes-tecnicos', component: DetalhesTecnicosPage },
+  { path: '**', redirectTo: 'inicio' },
 ];
 
 @NgModule({
