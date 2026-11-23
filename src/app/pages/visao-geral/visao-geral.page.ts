@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { AppLogService } from '../../core/app-log.service';
 import { DeviceInfoService } from '../../core/device-info.service';
 import { LogImportService } from '../../core/log-import.service';
@@ -29,7 +29,10 @@ export class VisaoGeralPage implements OnInit {
     public session: SessionService,
     public usb: UsbService,
     public logs: LogImportService,
-    public appLog: AppLogService
+    public appLog: AppLogService,
+    // Sem zone.js o app é zoneless: uma conclusão assíncrona fora de um evento
+    // Angular não agenda nova verificação de mudanças (botão ficaria em "Coletando…" para sempre).
+    private cdr: ChangeDetectorRef
   ) {}
 
   get sessaoAtiva(): Sessao | null {
@@ -54,6 +57,7 @@ export class VisaoGeralPage implements OnInit {
       this.aviso = `Falha na coleta: ${e instanceof Error ? e.message : String(e)}`;
     } finally {
       this.carregando = false;
+      this.cdr.markForCheck();
     }
   }
 

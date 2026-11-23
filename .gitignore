@@ -68,3 +68,9 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Android build outputs (temporary redirect for OneDrive file-lock issues)
+/android/init.gradle
+/android/tmp-build/
+/android/app/build/
+/android/.gradle/

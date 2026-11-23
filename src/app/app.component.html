@@ -1,13 +1,15 @@
 <ion-app>
   <ion-tabs>
-    <ion-router-outlet></ion-router-outlet>
+    <!-- O IonTabs do Ionic 9 já renderiza o próprio ion-router-outlet dentro de
+         .tabs-inner; declarar outro aqui cria um outlet vazio em position:absolute
+         cobrindo a tela e interceptando todos os toques. -->
     <ion-tab-bar slot="bottom">
       <ion-tab-button tab="visao-geral" href="/visao-geral">
         <ion-icon name="phone-portrait-outline"></ion-icon>
         <ion-label>Visão geral</ion-label>
       </ion-tab-button>
       <ion-tab-button tab="usb" href="/usb">
-        <ion-icon name="usb-outline"></ion-icon>
+        <ion-icon name="link-outline"></ion-icon>
         <ion-label>USB</ion-label>
       </ion-tab-button>
       <ion-tab-button tab="sessao" href="/sessao">

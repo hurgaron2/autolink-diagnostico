@@ -11,6 +11,8 @@ import { SessionService } from '../../core/session.service';
 export class SessaoPage {
   novaObservacao = '';
   mensagem: string | null = null;
+  erro: string | null = null;
+  processando = false;
 
   constructor(public session: SessionService) {}
 
@@ -27,23 +29,28 @@ export class SessaoPage {
   }
 
   async iniciar(): Promise<void> {
-    await this.session.iniciar();
-    this.mostrar('Sessão iniciada. A linha do tempo começa agora.');
+    await this.executar(() => this.session.iniciar(), 'Sessão iniciada. A linha do tempo começa agora.');
   }
 
   async encerrar(): Promise<void> {
-    await this.session.encerrar();
-    this.mostrar('Sessão encerrada e salva localmente.');
+    await this.executar(() => this.session.encerrar(), 'Sessão encerrada e salva localmente.');
+  }
+
+  /** Um único botão que alterna entre iniciar e encerrar conforme o estado da sessão. */
+  async alternarSessao(): Promise<void> {
+    if (this.session.sessao) {
+      await this.encerrar();
+    } else {
+      await this.iniciar();
+    }
   }
 
   async tentativa(): Promise<void> {
-    await this.session.tentativaConexao();
-    this.mostrar('Tentativa de conexão marcada.');
+    await this.executar(() => this.session.tentativaConexao(), 'Tentativa de conexão marcada.');
   }
 
   async erro7(): Promise<void> {
-    await this.session.erro7();
-    this.mostrar('Instante do erro 7 marcado.');
+    await this.executar(() => this.session.erro7(), 'Instante do erro 7 marcado.');
   }
 
   async adicionarObservacao(): Promise<void> {
@@ -52,9 +59,30 @@ export class SessaoPage {
       this.mostrar('Escreva a observação antes de adicionar.');
       return;
     }
-    await this.session.observacao(texto);
-    this.novaObservacao = '';
-    this.mostrar('Observação adicionada.');
+    await this.executar(
+      async () => {
+        await this.session.observacao(texto);
+        this.novaObservacao = '';
+      },
+      'Observação adicionada.'
+    );
+  }
+
+  /** Um toque por vez; o estado é sempre liberado, inclusive quando a chamada falha. */
+  private async executar(acao: () => Promise<void>, ok: string): Promise<void> {
+    if (this.processando) {
+      return;
+    }
+    this.processando = true;
+    try {
+      await acao();
+      this.erro = null;
+      this.mostrar(ok);
+    } catch (e) {
+      this.erro = `Não foi possível concluir: ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      this.processando = false;
+    }
   }
 
   corDoEvento(tipo: Evento['tipo']): string {

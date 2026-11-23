@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { UsbAccessoryInfo, UsbDeviceInfo, UsbSnapshot } from '../../core/models';
 import { UsbService } from '../../core/usb.service';
 
@@ -12,7 +12,7 @@ export class UsbPage {
   enumerando = false;
   expandido: string | null = null;
 
-  constructor(public usb: UsbService) {}
+  constructor(public usb: UsbService, private cdr: ChangeDetectorRef) {}
 
   get snapshot(): UsbSnapshot | null {
     return this.usb.snapshotAtual;
@@ -35,6 +35,8 @@ export class UsbPage {
       await this.usb.enumerar();
     } finally {
       this.enumerando = false;
+      // app zoneless: a entrada da tela não é um evento Angular, então avisa explicitamente
+      this.cdr.markForCheck();
     }
   }
 

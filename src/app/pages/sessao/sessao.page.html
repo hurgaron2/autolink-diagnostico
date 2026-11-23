@@ -14,15 +14,20 @@
       <ion-card-subtitle *ngIf="!sessao">Nenhuma sessão ativa</ion-card-subtitle>
     </ion-card-header>
     <ion-card-content>
-      <ion-button expand="block" size="large" color="success" [disabled]="!!sessao" (click)="iniciar()">
-        Iniciar sessão
+      <ion-button expand="block" size="large" [color]="sessao ? 'medium' : 'success'" [disabled]="processando" (click)="alternarSessao()">
+        {{ sessao ? 'Encerrar sessão' : 'Iniciar sessão' }}
       </ion-button>
-      <ion-button expand="block" size="large" [disabled]="!sessao" (click)="tentativa()">
+      <ion-button expand="block" size="large" [disabled]="!sessao || processando" (click)="tentativa()">
         Marcar tentativa de conexão
       </ion-button>
-      <ion-button expand="block" size="large" color="danger" [disabled]="!sessao" (click)="erro7()">
+      <ion-button expand="block" size="large" color="danger" [disabled]="!sessao || processando" (click)="erro7()">
         Marcar “Erro 7 apareceu”
       </ion-button>
+
+      <ion-note *ngIf="!sessao" color="medium" class="motivo">
+        Inicie a sessão para liberar as marcações e a observação: elas gravam na linha do tempo
+        desta sessão. Visão geral, USB, Logs e Relatório funcionam sem sessão.
+      </ion-note>
 
       <ion-item>
         <ion-textarea
@@ -31,17 +36,14 @@
           placeholder="O que você observou na central ou no telefone?"
           [(ngModel)]="novaObservacao"
           [autoGrow]="true"
-          [disabled]="!sessao"
+          [disabled]="!sessao || processando"
         ></ion-textarea>
       </ion-item>
-      <ion-button expand="block" size="large" fill="outline" [disabled]="!sessao" (click)="adicionarObservacao()">
+      <ion-button expand="block" size="large" fill="outline" [disabled]="!sessao || processando" (click)="adicionarObservacao()">
         Adicionar observação
       </ion-button>
 
-      <ion-button expand="block" size="large" color="medium" [disabled]="!sessao" (click)="encerrar()">
-        Encerrar sessão
-      </ion-button>
-
+      <ion-note *ngIf="erro" color="danger" class="mensagem">{{ erro }}</ion-note>
       <ion-note *ngIf="mensagem" color="primary" class="mensagem">{{ mensagem }}</ion-note>
       <ion-note color="medium" class="aviso-persistencia">
         A sessão fica salva em armazenamento local durante a reprodução. Sem serviço em segundo
