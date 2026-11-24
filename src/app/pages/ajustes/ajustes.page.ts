@@ -11,7 +11,7 @@ import { CenarioSimulacao, SimulacaoService } from '../../core/simulacao.service
   standalone: false,
 })
 export class AjustesPage {
-  versao = '1.5';
+  versao = '1.6';
   sanitizar = true;
   ultimaSimulacao: string | null = null;
 

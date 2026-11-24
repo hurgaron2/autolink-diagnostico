@@ -1,17 +1,8 @@
 import { Injectable } from '@angular/core';
 import { AppLogService } from './app-log.service';
-import { UsbDeviceInfo, UsbAccessoryInfo } from './models';
+import { EquipamentoDetectado, Sessao, UsbDeviceInfo, UsbAccessoryInfo } from './models';
 
-export interface EquipamentoDetectado {
-  id: string;
-  tipo: 'usb_dispositivo' | 'usb_acessorio' | 'bluetooth' | 'rede' | 'adaptador';
-  origem: 'api' | 'manual' | 'indisponivel';
-  valor: any;
-  detalhe?: string;
-  horario: string;
-  equipamentoPertence: 'telefone' | 'central' | 'adaptador' | 'desconhecido';
-  evidencia: 'observado' | 'derivado' | 'indisponivel';
-}
+export type { EquipamentoDetectado } from './models';
 
 /**
  * Provedor de identificação de equipamentos.
@@ -21,8 +12,20 @@ export interface EquipamentoDetectado {
 @Injectable({ providedIn: 'root' })
 export class IdentificacaoService {
   equipamentos: EquipamentoDetectado[] = [];
+  sessaoIdAtiva: string | null = null;
+  sessaoAtiva: Sessao | null = null;
+  aoRegistrar: (() => void) | null = null;
 
   constructor(private appLog: AppLogService) {}
+
+  /** Grava a observação também dentro da sessão ativa e pede sua persistência. */
+  private adicionar(equip: EquipamentoDetectado): void {
+    this.equipamentos.push(equip);
+    if (this.sessaoAtiva && Array.isArray(this.sessaoAtiva.equipamentos)) {
+      this.sessaoAtiva.equipamentos.push(equip);
+    }
+    this.aoRegistrar?.();
+  }
 
   /** Registra um dispositivo USB enumerado publicamente. */
   registrarUsbDispositivo(d: UsbDeviceInfo): void {
@@ -50,10 +53,11 @@ export class IdentificacaoService {
       },
       detalhe: `Dispositivo USB enumerado via UsbManager (somente leitura).`,
       horario: new Date().toISOString(),
+      sessaoId: this.sessaoIdAtiva,
       equipamentoPertence: 'desconhecido',
       evidencia: 'observado',
     };
-    this.equipamentos.push(equip);
+    this.adicionar(equip);
     this.appLog.log(`equipamento USB observado: VID ${d.vid} / PID ${d.pid}`, 'info');
   }
 
@@ -72,10 +76,11 @@ export class IdentificacaoService {
       },
       detalhe: 'Acessório USB listado via UsbManager (somente leitura).',
       horario: new Date().toISOString(),
+      sessaoId: this.sessaoIdAtiva,
       equipamentoPertence: 'desconhecido',
       evidencia: 'observado',
     };
-    this.equipamentos.push(equip);
+    this.adicionar(equip);
     this.appLog.log(`acessório USB observado: ${a.modelo ?? 'sem nome'}`, 'info');
   }
 
@@ -88,10 +93,11 @@ export class IdentificacaoService {
       valor: { nome, tipo, detalhe },
       detalhe,
       horario: new Date().toISOString(),
+      sessaoId: this.sessaoIdAtiva,
       equipamentoPertence: 'adaptador',
       evidencia: 'observado',
     };
-    this.equipamentos.push(equip);
+    this.adicionar(equip);
     this.appLog.log(`adaptador observado: ${nome} (${tipo})`, 'info');
   }
 
@@ -104,10 +110,11 @@ export class IdentificacaoService {
       valor: null,
       detalhe: `Não exposto pela conexão atual: ${motivo}`,
       horario: new Date().toISOString(),
+      sessaoId: this.sessaoIdAtiva,
       equipamentoPertence: 'desconhecido',
       evidencia: 'indisponivel',
     };
-    this.equipamentos.push(equip);
+    this.adicionar(equip);
     this.appLog.log(`campo indisponível: ${campo} — ${motivo}`, 'aviso');
   }
 
@@ -132,8 +139,11 @@ export class IdentificacaoService {
     this.equipamentos = [];
   }
 
-  /** Exporta para serialização em detected-equipment.json. */
-  exportar(): EquipamentoDetectado[] {
-    return [...this.equipamentos];
+  /** Exporta só a sessão pedida; sem argumento devolve todo o catálogo em memória. */
+  exportar(sessaoId?: string | null): EquipamentoDetectado[] {
+    if (sessaoId === undefined) {
+      return [...this.equipamentos];
+    }
+    return this.equipamentos.filter((e) => e.sessaoId === sessaoId);
   }
 }

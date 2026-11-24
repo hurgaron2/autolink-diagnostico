@@ -6,7 +6,6 @@ import { CentralService } from './central.service';
 import { DeviceInfoService } from './device-info.service';
 import { Evento, PhoneInfo, SCHEMA_VERSION, Sessao, UsbSnapshot } from './models';
 import { DiagnosticoService } from './diagnostico.service';
-import { IdentificacaoService } from './identificacao.service';
 import { LogImportService } from './log-import.service';
 import { AVISO_SANITIZACAO, sanitizar } from './sanitize';
 import { StorageService } from './storage.service';
@@ -15,7 +14,7 @@ import { UsbService } from './usb.service';
 
 const APP_NOME = 'AutoLink Diagnóstico';
 const APP_ID = 'com.autolink.diagnostico';
-const APP_VERSAO = '1.5';
+const APP_VERSAO = '1.6';
 
 export interface OpcoesExport {
   incluirLogs: boolean;
@@ -74,7 +73,6 @@ export class ExportService {
     private logs: LogImportService,
     private appLog: AppLogService,
     private storage: StorageService,
-    private identificacao: IdentificacaoService,
     private storagePublic: StoragePublicService
   ) {}
 
@@ -105,6 +103,10 @@ export class ExportService {
     }
     if (sessao?.simulacao) {
       avisos.push('SIMULAÇÃO — não representa conexão física. Dados sintéticos de teste de software.');
+    }
+    const equipamentosDisponiveis = !!sessao && Array.isArray(sessao.equipamentos);
+    if (sessao && !equipamentosDisponiveis) {
+      avisos.push('Observações de equipamentos indisponíveis: sessão registrada antes do armazenamento por sessão.');
     }
 
     const snapshots: UsbSnapshot[] = sessao
@@ -210,7 +212,13 @@ export class ExportService {
         coletadoEm: new Date().toISOString(),
         observacao: 'Equipamentos identificados apenas a partir de metadados públicos disponíveis. '
           + 'Nenhum dado de firmware da central foi lido por USB. Adaptador não é confundido com central.',
-        equipamentos: this.identificacao.exportar(),
+        disponivel: equipamentosDisponiveis,
+        ...(equipamentosDisponiveis ? {} : {
+          motivoIndisponibilidade: sessao
+            ? 'Sessão registrada antes do armazenamento de equipamentos; observações não recuperáveis.'
+            : 'Nenhuma sessão selecionada.',
+        }),
+        equipamentos: equipamentosDisponiveis ? sessao!.equipamentos! : [],
       },
       null,
       2

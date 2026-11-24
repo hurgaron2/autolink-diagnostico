@@ -126,6 +126,8 @@ describe('ExportService', () => {
 
   it('inclui detected-equipment.json com equipamentos observados', async () => {
     const identificacao = TestBed.inject(IdentificacaoService);
+    const diagnostico = TestBed.inject(DiagnosticoService);
+    await diagnostico.iniciar();
     identificacao.registrarUsbDispositivo({
       key: 'vid:111:pid:222',
       vid: 111,
@@ -141,12 +143,127 @@ describe('ExportService', () => {
     });
     const { arquivos } = await service.construirArquivos({ incluirLogs: false, sanitizar: true });
     const equip = JSON.parse(arquivos['detected-equipment.json']) as {
+      disponivel: boolean;
       equipamentos: Array<{ tipo: string; origem: string; evidencia: string }>;
     };
+    expect(equip.disponivel).toBe(true);
     expect(equip.equipamentos.length).toBe(1);
     expect(equip.equipamentos[0].tipo).toBe('usb_dispositivo');
     expect(equip.equipamentos[0].origem).toBe('api');
     expect(equip.equipamentos[0].evidencia).toBe('observado');
+  });
+
+  it('detected-equipment.json traz só equipamentos da sessão exportada', async () => {
+    const identificacao = TestBed.inject(IdentificacaoService);
+    const diagnostico = TestBed.inject(DiagnosticoService);
+    const agora = new Date().toISOString();
+    identificacao.sessaoIdAtiva = 'sessao-a';
+    identificacao.registrarUsbAcessorio({
+      key: 'acc:A', fabricante: 'FabA', modelo: 'ModeloA', descricao: null, versao: null, uri: null,
+    });
+    const daSessao = identificacao.exportar('sessao-a');
+    identificacao.registrarUsbAcessorio({
+      key: 'acc:B', fabricante: 'FabB', modelo: 'ModeloB', descricao: null, versao: null, uri: null,
+    });
+    diagnostico.sessao = {
+      id: 'sessao-a',
+      iniciadaEm: agora,
+      encerradaEm: null,
+      snapshotInicial: null,
+      phoneSnapshot: null,
+      eventos: [],
+      lacunas: [],
+      ultimaAtividadeIso: agora,
+      equipamentos: daSessao,
+      simulacao: false,
+    };
+
+    const { arquivos } = await service.construirArquivos({
+      incluirLogs: false,
+      sanitizar: true,
+      idSessao: 'sessao-a',
+    });
+    const equip = JSON.parse(arquivos['detected-equipment.json']) as {
+      equipamentos: Array<{ sessaoId: string | null; valor: { modelo: string } }>;
+    };
+    expect(equip.equipamentos.length).toBe(1);
+    expect(equip.equipamentos[0].sessaoId).toBe('sessao-a');
+    expect(equip.equipamentos[0].valor.modelo).toBe('ModeloA');
+  });
+
+  it('mantém observações isoladas após reinício do app ao exportar por ID', async () => {
+    const diagnostico = TestBed.inject(DiagnosticoService);
+    const identificacao = TestBed.inject(IdentificacaoService);
+
+    await diagnostico.iniciar();
+    const idA = diagnostico.sessao!.id;
+    identificacao.registrarUsbAcessorio({
+      key: 'acc:A', fabricante: 'FabA', modelo: 'ModeloA', descricao: null, versao: null, uri: null,
+    });
+    await diagnostico.encerrar();
+
+    await diagnostico.iniciar();
+    const idB = diagnostico.sessao!.id;
+    identificacao.registrarUsbAcessorio({
+      key: 'acc:B', fabricante: 'FabB', modelo: 'ModeloB', descricao: null, versao: null, uri: null,
+    });
+    await diagnostico.encerrar();
+
+    // Reinício do app: novo DI, mesma localStorage.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const novoExport = TestBed.inject(ExportService);
+
+    const a = await novoExport.construirArquivos({ incluirLogs: false, sanitizar: true, idSessao: idA });
+    const eqA = JSON.parse(a.arquivos['detected-equipment.json']) as {
+      disponivel: boolean;
+      equipamentos: Array<{ sessaoId: string; horario: string; valor: { modelo: string } }>;
+    };
+    expect(eqA.disponivel).toBe(true);
+    expect(eqA.equipamentos.length).toBe(1);
+    expect(eqA.equipamentos[0].sessaoId).toBe(idA);
+    expect(eqA.equipamentos[0].valor.modelo).toBe('ModeloA');
+    expect(eqA.equipamentos[0].horario).toBeTruthy();
+    expect(JSON.stringify(eqA).includes(idB)).toBe(false);
+
+    const b = await novoExport.construirArquivos({ incluirLogs: false, sanitizar: true, idSessao: idB });
+    const eqB = JSON.parse(b.arquivos['detected-equipment.json']) as {
+      equipamentos: Array<{ sessaoId: string; valor: { modelo: string } }>;
+    };
+    expect(eqB.equipamentos.length).toBe(1);
+    expect(eqB.equipamentos[0].sessaoId).toBe(idB);
+    expect(eqB.equipamentos[0].valor.modelo).toBe('ModeloB');
+  });
+
+  it('marca como indisponíveis observações de sessão gravada antes da persistência', async () => {
+    const agora = new Date().toISOString();
+    const antiga: Sessao = {
+      id: 'sessao-antiga',
+      iniciadaEm: agora,
+      encerradaEm: agora,
+      snapshotInicial: null,
+      phoneSnapshot: null,
+      eventos: [],
+      lacunas: [],
+      ultimaAtividadeIso: agora,
+      simulacao: false,
+    };
+    localStorage.setItem('autolink.diagnostico.historico', JSON.stringify([antiga]));
+
+    const { arquivos, avisos } = await service.construirArquivos({
+      incluirLogs: false,
+      sanitizar: true,
+      idSessao: 'sessao-antiga',
+    });
+    const equip = JSON.parse(arquivos['detected-equipment.json']) as {
+      disponivel: boolean;
+      motivoIndisponibilidade?: string;
+      equipamentos: unknown[];
+    };
+    expect(equip.disponivel).toBe(false);
+    expect(equip.motivoIndisponibilidade).toBeTruthy();
+    expect(equip.equipamentos).toEqual([]);
+    expect(avisos.some((a) => a.includes('indisponíveis'))).toBe(true);
   });
 
   it('inclui conexões.jsonl com eventos de conexão da sessão', async () => {

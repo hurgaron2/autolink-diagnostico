@@ -1,6 +1,5 @@
 import { Component } from '@angular/core';
 import { DiagnosticoService } from '../../core/diagnostico.service';
-import { IdentificacaoService } from '../../core/identificacao.service';
 import { UsbService } from '../../core/usb.service';
 import { Sessao, UsbSnapshot } from '../../core/models';
 import { Router } from '@angular/router';
@@ -21,7 +20,6 @@ export class DetalhesTecnicosPage {
 
   constructor(
     public diagnostico: DiagnosticoService,
-    public identificacao: IdentificacaoService,
     public usb: UsbService,
     private appLog: AppLogService,
     private router: Router
@@ -30,6 +28,20 @@ export class DetalhesTecnicosPage {
   async ionViewWillEnter(): Promise<void> {
     this.sessao = this.diagnostico.sessao ?? null;
     this.snapshot = this.usb.snapshotAtual;
+  }
+
+  get equipamentos() {
+    return this.sessao?.equipamentos ?? [];
+  }
+
+  get equipamentosDisponiveis(): boolean {
+    return Array.isArray(this.sessao?.equipamentos);
+  }
+
+  get motivoEquipamentosIndisponiveis(): string {
+    return this.sessao
+      ? 'Sessão registrada antes do armazenamento de equipamentos; observações não recuperáveis.'
+      : 'Nenhuma sessão selecionada.';
   }
 
   formatarDuracao(seg: number): string {
@@ -107,7 +119,11 @@ export class DetalhesTecnicosPage {
   async compartilharArquivos(): Promise<void> {
     const texto = JSON.stringify({
       sessao: this.sessao,
-      equipamentos: this.identificacao.exportar(),
+      disponivel: this.equipamentosDisponiveis,
+      ...(this.equipamentosDisponiveis ? {} : {
+        motivoIndisponibilidade: this.motivoEquipamentosIndisponiveis,
+      }),
+      equipamentos: this.equipamentos,
     }, null, 2);
     const file = new File([texto], `autolink-detalhes-tecnicos-${this.sessao?.id ?? 'sem-id'}.json`, { type: 'application/json' });
     try {

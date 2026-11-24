@@ -116,6 +116,45 @@ describe('DiagnosticoService', () => {
     expect(exportada).not.toBeNull();
     expect(exportada?.encerradaEm).not.toBeNull();
   });
+
+  it('persiste observações de equipamentos dentro da sessão e no histórico', async () => {
+    await service.iniciar();
+    const id = service.sessao!.id;
+    const identificacao = TestBed.inject(IdentificacaoService);
+    identificacao.registrarUsbAcessorio({
+      key: 'acc:persistido', fabricante: 'Fab', modelo: 'ModeloPersistido', descricao: null, versao: null, uri: null,
+    });
+
+    const observado = service.sessao!.equipamentos![0];
+    expect(observado.sessaoId).toBe(id);
+    expect(observado.origem).toBe('api');
+    expect(observado.horario).toBeTruthy();
+
+    await service.encerrar();
+    const historico = lerJson<Array<{ id: string; equipamentos?: unknown[] }>>('diagnostico.historico', []);
+    expect(historico.find((s) => s.id === id)?.equipamentos?.[0]).toEqual(observado);
+  });
+
+  it('persiste equipamentos vistos no snapshot inicial da sessão', async () => {
+    const usb = TestBed.inject(UsbService);
+    const snapshot = usb.snapshotVazio(null, true);
+    snapshot.dispositivos.push({
+      key: 'vid:111:pid:222', vid: 111, pid: 222,
+      classe: 0, subclasse: 0, protocolo: 0,
+      fabricante: 'Fab', produto: 'Prod', versao: '1.0', serial: null, interfaces: [],
+    });
+    vi.spyOn(usb, 'enumerar').mockResolvedValue(snapshot);
+
+    await service.iniciar();
+    const id = service.sessao!.id;
+    const observado = service.sessao!.equipamentos![0];
+    expect(observado.sessaoId).toBe(id);
+    expect(observado.valor.vid).toBe(111);
+
+    await service.encerrar();
+    const historico = lerJson<Array<{ id: string; equipamentos?: Array<{ sessaoId: string }> }>>('diagnostico.historico', []);
+    expect(historico.find((s) => s.id === id)?.equipamentos?.[0].sessaoId).toBe(id);
+  });
 });
 
 function lerJson<T>(chave: string, padrao: T): T {

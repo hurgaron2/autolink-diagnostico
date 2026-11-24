@@ -31,13 +31,13 @@
     </ion-accordion>
 
     <!-- Equipamentos detectados -->
-    <ion-accordion value="equipamentos" [disabled]="identificacao.equipamentos.length === 0">
+    <ion-accordion value="equipamentos" [disabled]="equipamentos.length === 0 && equipamentosDisponiveis">
       <div slot="header">
         <ion-label>Equipamentos detectados</ion-label>
       </div>
       <div slot="content" class="conteudo-secao">
         <ion-list lines="full">
-          <ion-item *ngFor="let e of identificacao.equipamentos">
+          <ion-item *ngFor="let e of equipamentos">
             <ion-label class="ion-text-wrap">
               <h3>{{ e.tipo === 'usb_dispositivo' ? 'USB' : e.tipo === 'usb_acessorio' ? 'Acessório USB' : e.tipo }}</h3>
               <p>{{ e.detalhe }}</p>
@@ -45,7 +45,10 @@
             </ion-label>
             <ion-badge slot="end" color="medium" size="small">{{ evidenciaLabel(e.evidencia) }}</ion-badge>
           </ion-item>
-          <ion-item *ngIf="identificacao.equipamentos.length === 0">
+          <ion-item *ngIf="equipamentos.length === 0 && !equipamentosDisponiveis">
+            <ion-label>Observações de equipamentos indisponíveis: {{ motivoEquipamentosIndisponiveis }}</ion-label>
+          </ion-item>
+          <ion-item *ngIf="equipamentos.length === 0 && equipamentosDisponiveis">
             <ion-label>Nenhum equipamento detectado.</ion-label>
           </ion-item>
         </ion-list>

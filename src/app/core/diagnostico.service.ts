@@ -68,6 +68,7 @@ export class DiagnosticoService {
     this.processando = true;
     this.erro = null;
     const id = gerarId();
+    this.identificacao.sessaoIdAtiva = id;
     const agora = new Date().toISOString();
     // Cada sessão começa com diff limpo e passa a receber só os próprios snapshots.
     this.usb.resetarDiff();
@@ -94,16 +95,6 @@ export class DiagnosticoService {
         this.appLog.log(`USB: falha na enumeração inicial — ${msg}`, 'erro');
       }
 
-      // Registra equipamentos USB identificados
-      if (snapshot) {
-        for (const d of snapshot.dispositivos) {
-          this.identificacao.registrarUsbDispositivo(d);
-        }
-        for (const a of snapshot.acessorios) {
-          this.identificacao.registrarUsbAcessorio(a);
-        }
-      }
-
       // 2. Dados do telefone
       let phone: PhoneInfo | null = null;
       try {
@@ -122,8 +113,21 @@ export class DiagnosticoService {
         eventos: [],
         lacunas: [],
         ultimaAtividadeIso: agora,
+        equipamentos: [],
         simulacao,
       };
+      this.identificacao.sessaoAtiva = this.sessao;
+      this.identificacao.aoRegistrar = () => this.persistir();
+
+      // 3b. Só agora, com a sessão existente, registra o que o snapshot inicial viu.
+      if (snapshot) {
+        for (const d of snapshot.dispositivos) {
+          this.identificacao.registrarUsbDispositivo(d);
+        }
+        for (const a of snapshot.acessorios) {
+          this.identificacao.registrarUsbAcessorio(a);
+        }
+      }
 
       // 4. Resultado individual de cada coletor disponível
       this.sessao.eventos.push(
@@ -198,6 +202,9 @@ export class DiagnosticoService {
       const msg = e instanceof Error ? e.message : String(e);
       if (!this.sessao) {
         this.usb.sessaoIdAtiva = null;
+        this.identificacao.sessaoIdAtiva = null;
+        this.identificacao.sessaoAtiva = null;
+        this.identificacao.aoRegistrar = null;
       }
       this.erro = `Falha ao iniciar diagnóstico: ${msg}`;
       this.appLog.log(this.erro, 'erro');
@@ -306,6 +313,9 @@ export class DiagnosticoService {
       // Limpa sessão ativa apenas APÓS persistir no histórico
       this.sessao = null;
       this.usb.sessaoIdAtiva = null;
+      this.identificacao.sessaoIdAtiva = null;
+      this.identificacao.sessaoAtiva = null;
+      this.identificacao.aoRegistrar = null;
       try {
         localStorage.removeItem(`autolink.${CHAVE_ATIVA}`);
       } catch {

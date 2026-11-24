@@ -66,4 +66,20 @@ describe('IdentificacaoService', () => {
     expect(service.porAdaptador.length).toBe(1);
     expect(service.desconhecidos.length).toBe(1);
   });
+
+  it('exporta somente equipamentos da sessão solicitada', () => {
+    service.sessaoIdAtiva = 'sessao-a';
+    service.registrarUsbAcessorio({
+      key: 'acc:A', fabricante: 'FabA', modelo: 'ModeloA', descricao: null, versao: null, uri: null,
+    });
+    service.sessaoIdAtiva = 'sessao-b';
+    service.registrarUsbAcessorio({
+      key: 'acc:B', fabricante: 'FabB', modelo: 'ModeloB', descricao: null, versao: null, uri: null,
+    });
+
+    expect(service.exportar('sessao-a').map((e) => (e.valor as any).modelo)).toEqual(['ModeloA']);
+    expect(service.exportar('sessao-b').map((e) => (e.valor as any).modelo)).toEqual(['ModeloB']);
+    expect(service.exportar(null)).toEqual([]);
+    expect(service.exportar().length).toBe(2);
+  });
 });

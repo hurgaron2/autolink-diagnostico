@@ -75,6 +75,19 @@ export interface UsbAccessoryInfo {
   uri: string | null;
 }
 
+/** Observação de equipamento, sempre ligada à sessão em que foi vista. */
+export interface EquipamentoDetectado {
+  id: string;
+  tipo: 'usb_dispositivo' | 'usb_acessorio' | 'bluetooth' | 'rede' | 'adaptador';
+  origem: 'api' | 'manual' | 'indisponivel';
+  valor: any;
+  detalhe?: string;
+  horario: string;
+  equipamentoPertence: 'telefone' | 'central' | 'adaptador' | 'desconhecido';
+  evidencia: 'observado' | 'derivado' | 'indisponivel';
+  sessaoId: string | null;
+}
+
 export interface UsbSnapshot {
   capturadoEm: string;
   monotonicMs: number;
@@ -147,6 +160,8 @@ export interface Sessao {
   eventos: Evento[];
   lacunas: Lacuna[];
   ultimaAtividadeIso: string;
+  /** Observações persistidas com a sessão. Ausente em sessões gravadas antes deste campo. */
+  equipamentos?: EquipamentoDetectado[];
   /** true somente em sessões sintéticas; nunca misturar com sessões reais. */
   simulacao?: boolean;
 }
