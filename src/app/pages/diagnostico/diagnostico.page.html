@@ -9,6 +9,11 @@
 
 <ion-content class="ion-padding">
   <div class="tela-diagnostico">
+    <div *ngIf="simulacaoAtiva" class="banner-simulacao">
+      <strong>SIMULAÇÃO — não representa conexão física.</strong>
+      Eventos sintéticos (simulation=true).
+    </div>
+
     <!-- Estado -->
     <div class="estado">
       <ion-icon name="pulse-outline" class="icone-estado"></ion-icon>

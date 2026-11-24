@@ -127,6 +127,7 @@ export class ResultadoPage implements OnInit {
       const r = await this.exportService.gerar({
         incluirLogs: false,
         sanitizar: true,
+        idSessao: this.sessao.id,
       });
       if (r.ok) {
         this.appLog.log(`relatório compartilhado: ${r.mensagem}`, 'info');

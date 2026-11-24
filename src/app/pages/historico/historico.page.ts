@@ -78,6 +78,7 @@ export class HistoricoPage implements OnInit {
     try {
       const texto = [
         `AutoLink Diagnóstico — Relatório`,
+        ...(sessao.simulacao ? ['SIMULAÇÃO — não representa conexão física (simulation=true)'] : []),
         `Data: ${sessao.iniciadaEm}`,
         `Duração: ${this.formatarDuracao(this.duracaoSegundos(sessao))}`,
         `Eventos: ${sessao.eventos.length}`,

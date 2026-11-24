@@ -46,6 +46,30 @@
     </ion-item>
   </ion-list>
 
+  <!-- Área de desenvolvimento: ausente no build de produção. -->
+  <div *ngIf="modoDesenvolvimento" class="area-simulacao">
+    <div class="banner-simulacao">
+      <strong>SIMULAÇÃO — não representa conexão física.</strong>
+      <p>Todos os eventos desta área são sintéticos (simulation=true). Serve apenas para validar software.</p>
+    </div>
+
+    <ion-button expand="block" fill="outline" size="small" (click)="iniciarSimulacao()">
+      Iniciar sessão simulada
+    </ion-button>
+
+    <ion-list lines="full">
+      <ion-item *ngFor="let cenario of cenarios" button detail="false" (click)="executarCenario(cenario.id)">
+        <ion-label class="ion-text-wrap">{{ cenario.rotulo }}</ion-label>
+      </ion-item>
+    </ion-list>
+
+    <ion-button expand="block" color="warning" size="small" [disabled]="!simulacaoAtiva" (click)="encerrarSimulacao()">
+      Encerrar sessão simulada e ver relatório
+    </ion-button>
+
+    <ion-note *ngIf="ultimaSimulacao" class="ion-text-wrap">{{ ultimaSimulacao }}</ion-note>
+  </div>
+
   <ion-note color="medium">
     Este aplicativo registra eventos de conexão (USB, Bluetooth, rede) observados
     por APIs públicas. Não lê logs privados de outros aplicativos, não acessa

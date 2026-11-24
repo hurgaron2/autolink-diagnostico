@@ -1,8 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { ExportService } from './export.service';
+import { ExportService, pastaPublicaSessao } from './export.service';
 import { LogImportService } from './log-import.service';
 import { StorageService } from './storage.service';
 import { IdentificacaoService } from './identificacao.service';
+import { DiagnosticoService } from './diagnostico.service';
+import { Sessao } from './models';
 
 describe('ExportService', () => {
   let service: ExportService;
@@ -152,6 +154,41 @@ describe('ExportService', () => {
     // conexoes.jsonl sempre deve estar presente (vazio se não houver eventos)
     expect(arquivos['conexoes.jsonl']).toBeDefined();
     expect(typeof arquivos['conexoes.jsonl']).toBe('string');
+  });
+
+  it('exporta exatamente a sessão pedida pelo ID, não a mais recente', async () => {
+    const diagnostico = TestBed.inject(DiagnosticoService);
+
+    await diagnostico.iniciar();
+    await diagnostico.registrarEvento('observacao', 'MARCA_A', 'somente A', 'manual');
+    const idA = diagnostico.sessao!.id;
+    await diagnostico.encerrar();
+
+    await diagnostico.iniciar();
+    await diagnostico.registrarEvento('observacao', 'MARCA_B', 'somente B', 'manual');
+    const idB = diagnostico.sessao!.id;
+    await diagnostico.encerrar();
+    expect(idA).not.toBe(idB);
+
+    const { arquivos } = await service.construirArquivos({
+      incluirLogs: false,
+      sanitizar: true,
+      idSessao: idA,
+    });
+    const timeline = JSON.parse(arquivos['timeline.json']) as {
+      sessao: { id: string; eventos: Array<{ rotulo: string }> };
+    };
+    expect(timeline.sessao.id).toBe(idA);
+    expect(timeline.sessao.eventos.some((e) => e.rotulo === 'MARCA_A')).toBe(true);
+    expect(timeline.sessao.eventos.some((e) => e.rotulo === 'MARCA_B')).toBe(false);
+    const manifest = JSON.parse(arquivos['manifest.json']) as { sessaoId: string };
+    expect(manifest.sessaoId).toBe(idA);
+  });
+
+  it('separa sessões simuladas das reais na pasta pública', () => {
+    expect(pastaPublicaSessao(null)).toBe('sem-sessao');
+    expect(pastaPublicaSessao({ id: 'abc' } as Sessao)).toBe('abc');
+    expect(pastaPublicaSessao({ id: 'abc', simulacao: true } as Sessao)).toBe('SIMULACAO/abc');
   });
 
   it('manifesto lista detected-equipment.json e conexões.jsonl', async () => {

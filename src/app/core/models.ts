@@ -83,6 +83,8 @@ export interface UsbSnapshot {
   acessorios: UsbAccessoryInfo[];
   notas: string[];
   erro: string | null;
+  simulacao?: boolean;
+  sessaoId?: string | null;
 }
 
 export interface UsbEvento {
@@ -126,6 +128,8 @@ export interface Evento {
   timestampIso: string;
   timezoneOffsetMin: number;
   monotonicMs: number;
+  /** true somente em eventos sintéticos de testes de software. */
+  simulacao?: boolean;
 }
 
 export interface Lacuna {
@@ -143,6 +147,8 @@ export interface Sessao {
   eventos: Evento[];
   lacunas: Lacuna[];
   ultimaAtividadeIso: string;
+  /** true somente em sessões sintéticas; nunca misturar com sessões reais. */
+  simulacao?: boolean;
 }
 
 export interface CampoCentral {

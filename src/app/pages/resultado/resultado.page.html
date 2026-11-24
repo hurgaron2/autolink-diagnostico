@@ -28,6 +28,11 @@
 
     <!-- Resultado válido -->
     <div *ngIf="!erroCarregamento && sessao" class="resultado-valido">
+      <div *ngIf="sessao.simulacao" class="banner-simulacao">
+        <strong>SIMULAÇÃO — não representa conexão física.</strong>
+        <p>Eventos sintéticos (simulation=true), usados apenas para validar o software.</p>
+      </div>
+
       <!-- Título -->
       <h1 *ngIf="concluido">Diagnóstico concluído</h1>
       <h1 *ngIf="!concluido">Diagnóstico salvo</h1>
@@ -67,7 +72,7 @@
 
       <div *ngIf="!temLimitacoes && concluido" class="aviso-sucesso">
         <h3>Registros salvos</h3>
-        <p>Os registros do diagnóstico foram salvos com sucesso. Não foi possível determinar a causa do problema automaticamente.</p>
+        <p>Os registros do diagnóstico foram salvos com sucesso. "Concluído" significa apenas que a coleta foi encerrada — não que a causa do erro 7 tenha sido identificada.</p>
       </div>
 
       <div *ngIf="!concluido" class="aviso-interrompido">

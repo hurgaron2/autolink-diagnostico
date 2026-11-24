@@ -33,7 +33,7 @@
         </ion-icon>
       </ion-avatar>
       <ion-label class="ion-text-wrap">
-        <h2>{{ dataFormatada(s) }}</h2>
+        <h2>{{ dataFormatada(s) }} <ion-badge *ngIf="s.simulacao" color="warning">SIMULAÇÃO</ion-badge></h2>
         <p>
           {{ formatarDuracao(duracaoSegundos(s)) }} ·
           {{ s.eventos.length }} evento(s) ·

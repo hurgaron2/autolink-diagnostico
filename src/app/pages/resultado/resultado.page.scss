@@ -116,6 +116,21 @@
   gap: 20px;
 }
 
+.banner-simulacao {
+  padding: 14px;
+  border: 2px solid var(--ion-color-warning);
+  border-radius: 10px;
+  background: rgba(var(--ion-color-warning-rgb, 255, 196, 9), 0.12);
+  color: var(--ion-color-warning);
+  text-align: left;
+}
+
+.banner-simulacao p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 ion-button {
   min-height: 56px;
   font-size: 16px;

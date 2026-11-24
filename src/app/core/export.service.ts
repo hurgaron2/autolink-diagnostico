@@ -20,6 +20,8 @@ const APP_VERSAO = '1.5';
 export interface OpcoesExport {
   incluirLogs: boolean;
   sanitizar: boolean;
+  /** ID da sessão aberta na tela; quando ausente usa a ativa/última (legado). */
+  idSessao?: string;
 }
 
 export interface ArquivosExport {
@@ -85,6 +87,10 @@ export class ExportService {
       'Este pacote é evidência de coleta, não um diagnóstico automático da causa do erro.',
     ];
 
+    if (opcoes.idSessao && !this.diagnostico.obterSessao(opcoes.idSessao)) {
+      throw new Error(`Sessão ${opcoes.idSessao} não encontrada no histórico nem entre as sessões ativas.`);
+    }
+
     let phone: PhoneInfo | null = null;
     try {
       phone = await this.device.coletar();
@@ -93,12 +99,22 @@ export class ExportService {
       avisos.push('Falha ao coletar o painel do telefone para o export.');
     }
 
-    const sessao: Sessao | null = this.diagnostico.sessaoParaExport();
+    const sessao: Sessao | null = this.diagnostico.obterSessao(opcoes.idSessao);
     if (!sessao) {
       avisos.push('Nenhuma sessão de diagnóstico registrada.');
     }
+    if (sessao?.simulacao) {
+      avisos.push('SIMULAÇÃO — não representa conexão física. Dados sintéticos de teste de software.');
+    }
 
-    const snapshots: UsbSnapshot[] = this.usb.snapshots;
+    const snapshots: UsbSnapshot[] = sessao
+      ? this.usb.snapshots.filter((s) => s.sessaoId === sessao.id)
+      : this.usb.snapshots;
+    // Sessão vinda do histórico pode não ter snapshots em memória (app reiniciado):
+    // o snapshotInicial viaja dentro da própria sessão persistida.
+    if (sessao && snapshots.length === 0 && sessao.snapshotInicial) {
+      snapshots.push(sessao.snapshotInicial);
+    }
     if (snapshots.length === 0) {
       avisos.push('Nenhuma enumeração USB registrada.');
     }
@@ -110,6 +126,8 @@ export class ExportService {
         schemaVersion: SCHEMA_VERSION,
         geradoEm: new Date().toISOString(),
         app: { nome: APP_NOME, appId: APP_ID, versao: APP_VERSAO },
+        sessaoId: sessao?.id ?? null,
+        simulacao: !!sessao?.simulacao,
         incluiLogs: opcoes.incluirLogs,
         sanitizado: opcoes.sanitizar,
         avisos,
@@ -173,7 +191,10 @@ export class ExportService {
       {
         sessaoAtiva: this.diagnostico.sessao !== null,
         sessao,
-        historicoRecente: this.diagnostico.historicoParaExport().slice(0, 5),
+        historicoRecente: this.diagnostico
+          .historicoParaExport()
+          .filter((s) => !!s.simulacao === !!sessao?.simulacao)
+          .slice(0, 5),
         nota: 'monotonicMs ordena eventos mesmo com mudança de relógio; timezoneOffsetMin indica o fuso local.',
       },
       null,
@@ -312,8 +333,7 @@ export class ExportService {
       let uriPublico: string | null = null;
       let caminhoPublico: string | null = null;
       if (Capacitor.isNativePlatform()) {
-        const sessao = this.diagnostico.sessaoParaExport();
-        const idSessao = sessao?.id ?? 'sem-sessao';
+        const idSessao = pastaPublicaSessao(this.diagnostico.obterSessao(opcoes.idSessao));
         const dadosBase64 = bytesToBase64(bytes);
         const r3 = await this.executarEtapa('gravacao', () =>
           this.storagePublic.salvar(nomeArquivo, dadosBase64, idSessao)
@@ -408,6 +428,9 @@ export class ExportService {
   ): string {
     const l: string[] = [];
     l.push(`${APP_NOME} — pacote de diagnóstico`);
+    if (sessao?.simulacao) {
+      l.push('SIMULAÇÃO — não representa conexão física. Dados sintéticos de teste de software.');
+    }
     l.push(`Gerado em: ${new Date().toISOString()}`);
     l.push(`Esquema: v${SCHEMA_VERSION} | Logs incluídos: ${opcoes.incluirLogs ? 'sim' : 'não'} | Sanitizado: ${opcoes.sanitizar ? 'sim' : 'NÃO'}`);
     l.push('');
@@ -484,6 +507,14 @@ export class ExportService {
     l.push('');
     return l.join('\n');
   }
+}
+
+/** Simulação e captura real nunca compartilham a mesma subpasta pública. */
+export function pastaPublicaSessao(sessao: Sessao | null): string {
+  if (!sessao) {
+    return 'sem-sessao';
+  }
+  return sessao.simulacao ? `SIMULACAO/${sessao.id}` : sessao.id;
 }
 
 export function nomeSeguro(nome: string): string {

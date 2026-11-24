@@ -49,6 +49,7 @@ export interface MudancaUsb {
   tipo: 'usb_conectado' | 'usb_desconectado';
   rotulo: string;
   detalhe: string;
+  simulacao?: boolean;
 }
 
 const MAX_SNAPSHOTS = 30;
@@ -64,6 +65,8 @@ export class UsbService {
   /** Mudanças detectadas entre enumerações (para a linha do tempo). */
   mudancas = new Subject<MudancaUsb>();
   observando = false;
+  /** Sessão que recebe os snapshots; impede mistura entre sessões no mesmo processo. */
+  sessaoIdAtiva: string | null = null;
 
   private listener: PluginListenerHandle | null = null;
   private chavesAnteriores = new Set<string>();
@@ -73,9 +76,9 @@ export class UsbService {
 
   async enumerar(): Promise<UsbSnapshot> {
     if (!pluginNativoDisponivel()) {
-      const vazio = this.vazio('Plugin nativo indisponível no navegador — abra o app instalado no Android.');
+      const vazio = this.snapshotVazio('Plugin nativo indisponível no navegador — abra o app instalado no Android.');
       this.appLog.log('USB: plugin nativo indisponível no navegador — enumeração vazia', 'aviso');
-      this.aplicar(vazio);
+      this.ingestarSnapshot(vazio);
       return vazio;
     }
 
@@ -90,30 +93,44 @@ export class UsbService {
         notas: raw.notas ?? [],
         erro: null,
       };
-      this.aplicar(snapshot);
+      this.ingestarSnapshot(snapshot);
       return snapshot;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      const vazio = this.vazio(`Falha ao enumerar USB: ${msg}`);
+      const vazio = this.snapshotVazio(`Falha ao enumerar USB: ${msg}`);
       this.appLog.log(`USB: falha na enumeração — ${msg}`, 'erro');
-      this.aplicar(vazio);
+      this.ingestarSnapshot(vazio);
       return vazio;
     }
   }
 
-  private vazio(erro: string): UsbSnapshot {
+  snapshotVazio(erro: string | null, simulacao = false): UsbSnapshot {
     return {
       capturadoEm: new Date().toISOString(),
       monotonicMs: 0,
       origem: 'api',
       dispositivos: [],
       acessorios: [],
-      notas: ['ausência de visibilidade não significa defeito de hardware nem "central desconectada"'],
+      notas: simulacao
+        ? ['SIMULAÇÃO — não representa conexão física; lista vazia sintética', 'simulation=true']
+        : ['ausência de visibilidade não significa defeito de hardware nem "central desconectada"'],
       erro,
+      simulacao,
     };
   }
 
-  private aplicar(snapshot: UsbSnapshot): void {
+  /** Zera o diff entre sessões para que chaves de uma não apareçam em outra. */
+  resetarDiff(): void {
+    this.chavesAnteriores = new Set<string>();
+    this.primeiraLeitura = true;
+    this.snapshotAtual = null;
+    this.sessaoIdAtiva = null;
+  }
+
+  /** Único ponto de entrada de snapshots (enumeração real ou simulação de desenvolvimento). */
+  ingestarSnapshot(snapshot: UsbSnapshot, simulacao = false): void {
+    snapshot.simulacao = simulacao;
+    snapshot.sessaoId = this.sessaoIdAtiva;
     const novasChaves = new Set<string>([
       ...snapshot.dispositivos.map((d) => chaveDevice(d)),
       ...snapshot.acessorios.map((a) => chaveAccessory(a)),
@@ -122,12 +139,12 @@ export class UsbService {
     if (!this.primeiraLeitura) {
       for (const k of novasChaves) {
         if (!this.chavesAnteriores.has(k)) {
-          this.emitirMudanca('usb_conectado', k);
+          this.emitirMudanca('usb_conectado', k, simulacao);
         }
       }
       for (const k of this.chavesAnteriores) {
         if (!novasChaves.has(k)) {
-          this.emitirMudanca('usb_desconectado', k);
+          this.emitirMudanca('usb_desconectado', k, simulacao);
         }
       }
     }
@@ -141,18 +158,20 @@ export class UsbService {
     }
   }
 
-  private emitirMudanca(tipo: MudancaUsb['tipo'], chave: string): void {
+  private emitirMudanca(tipo: MudancaUsb['tipo'], chave: string, simulacao: boolean): void {
     const rotulo = tipo === 'usb_conectado' ? 'USB conectado' : 'USB desconectado';
-    this.mudancas.next({ tipo, rotulo, detalhe: chave });
-    this.appLog.log(`USB: ${rotulo} (${chave})`, 'info');
+    this.mudancas.next({ tipo, rotulo, detalhe: chave, simulacao });
+    this.appLog.log(`USB: ${rotulo} (${chave})${simulacao ? ' [SIMULAÇÃO]' : ''}`, 'info');
   }
 
   async iniciarObservacao(): Promise<void> {
     if (this.observando || !pluginNativoDisponivel()) {
       return;
     }
+    let iniciado = false;
     try {
       await AutoLink.startObserving();
+      iniciado = true;
       this.listener = await AutoLink.addListener('usbEvent', (ev) => {
         const evento = ev as unknown as UsbEvento;
         this.appLog.log(
@@ -165,8 +184,19 @@ export class UsbService {
       this.observando = true;
       this.appLog.log('observador USB público registrado (somente leitura)', 'info');
     } catch (e) {
+      // startObserving pode ter sucedido antes de addListener falhar: desfaz para
+      // não deixar o receiver nativo ativo sem listener e sem estado observando.
+      if (iniciado) {
+        try {
+          await AutoLink.stopObserving();
+        } catch {
+          // ignora
+        }
+      }
       const msg = e instanceof Error ? e.message : String(e);
-      this.appLog.log(`não foi possível observar eventos USB: ${msg}`, 'aviso');
+      this.appLog.log(`não foi possível observar eventos USB: ${msg}`, 'erro');
+      this.observando = false;
+      throw e;
     }
   }
 

@@ -22,6 +22,10 @@ export class DiagnosticoPage {
     return 'Agora conecte o celular à central. Continue o teste normalmente. Estamos registrando os eventos disponíveis.';
   }
 
+  get simulacaoAtiva(): boolean {
+    return !!this.diagnostico.sessao?.simulacao;
+  }
+
   get temFalhaColeta(): boolean {
     return this.diagnostico.sessao?.eventos.some((e) => e.tipo === 'erro_coleta') ?? false;
   }

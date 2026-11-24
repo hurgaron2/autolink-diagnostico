@@ -71,6 +71,43 @@ describe('DiagnosticoService', () => {
     expect(service.duracaoSegundos).toBe(0);
   });
 
+  it('registra o resultado de cada coletor e persiste o snapshot mesmo vazio', async () => {
+    await service.iniciar();
+    const eventos = service.sessao!.eventos;
+    const coletores = eventos.filter(
+      (e) => e.tipo === 'collector_started' || e.tipo === 'collector_failed'
+    );
+    expect(coletores.length).toBe(2);
+    expect(coletores.some((e) => (e.detalhe ?? '').startsWith('enumeração:'))).toBe(true);
+    expect(coletores.some((e) => (e.detalhe ?? '').startsWith('observação:'))).toBe(true);
+    expect(service.sessao!.snapshotInicial).not.toBeNull();
+    expect(eventos.some((e) => e.tipo === 'initial_snapshot')).toBe(true);
+  });
+
+  it('não marca o coletor de eventos como ativo sem receiver registrado', async () => {
+    await service.iniciar();
+    const observador = service.sessao!.eventos.find((e) =>
+      (e.detalhe ?? '').startsWith('observação:')
+    );
+    expect(observador?.tipo).toBe('collector_failed');
+    expect(service.observando).toBe(false);
+  });
+
+  it('impede misturar eventos reais em sessão simulada', async () => {
+    await service.iniciar('simulacao');
+    await service.registrarEvento('usb_conectado', 'evento real', 'x', 'api', 'info', false);
+    await service.registrarEvento('app_evento', 'SIMULAÇÃO — evento sintético', 'y', 'api', 'info', true);
+    const eventos = service.sessao!.eventos;
+    expect(eventos.some((e) => e.rotulo === 'evento real')).toBe(false);
+    expect(eventos.some((e) => e.rotulo === 'SIMULAÇÃO — evento sintético')).toBe(true);
+    expect(eventos.every((e) => e.simulacao === true)).toBe(true);
+  });
+
+  it('impede alternar entre simulação e captura real com sessão ativa', async () => {
+    await service.iniciar('simulacao');
+    await expect(service.iniciar('real')).rejects.toThrow();
+  });
+
   it('sessaoParaExport retorna a última sessão encerrada quando não há ativa', async () => {
     expect(service.sessaoParaExport()).toBeNull();
     await service.iniciar();

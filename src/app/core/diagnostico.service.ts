@@ -43,25 +43,51 @@ export class DiagnosticoService {
     private device: DeviceInfoService,
     private appLog: AppLogService,
     private identificacao: IdentificacaoService
-  ) {}
+  ) {
+    // Única assinatura: mudanças vêm da enumeração real ou da simulação de desenvolvimento.
+    this.usb.mudancas.subscribe((m) => {
+      void this.registrarMudancaUsb(m);
+    });
+  }
 
-  /** Inicia o diagnóstico: snapshot inicial + dados do telefone + primeiro evento. */
-  async iniciar(): Promise<void> {
+  /**
+   * Inicia o diagnóstico com snapshot e resultado individual de cada coletor.
+   * Modos diferentes nunca compartilham a mesma sessão.
+   */
+  async iniciar(modo: 'real' | 'simulacao' = 'real'): Promise<void> {
+    const simulacao = modo === 'simulacao';
+    if (this.processando) {
+      throw new Error('Inicialização de diagnóstico já em andamento.');
+    }
     if (this.sessao) {
+      if (!!this.sessao.simulacao !== simulacao) {
+        throw new Error('Sessão ativa de origem diferente: não é permitido misturar simulação e captura real.');
+      }
       return;
     }
     this.processando = true;
     this.erro = null;
+    const id = gerarId();
+    const agora = new Date().toISOString();
+    // Cada sessão começa com diff limpo e passa a receber só os próprios snapshots.
+    this.usb.resetarDiff();
+    this.usb.sessaoIdAtiva = id;
     let snapshot: UsbSnapshot | null = null;
     let usbOk = false;
 
     try {
-      // 1. Snapshot inicial de USB
+      // 1. Snapshot inicial de USB — persistido mesmo vazio ou com erro.
       try {
-        snapshot = await this.executarComTimeout(
-          () => this.usb.enumerar(),
-          'enumeração USB'
-        );
+        if (simulacao) {
+          // Nunca enumera USB real dentro de uma sessão sintética.
+          snapshot = this.usb.snapshotVazio(null, true);
+          this.usb.ingestarSnapshot(snapshot, true);
+        } else {
+          snapshot = await this.executarComTimeout(
+            () => this.usb.enumerar(),
+            'enumeração USB'
+          );
+        }
         usbOk = snapshot !== null && snapshot.erro === null;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -87,9 +113,8 @@ export class DiagnosticoService {
       }
 
       // 3. Cria a sessão com startedAt válido ANTES de qualquer coleta posterior
-      const agora = new Date().toISOString();
       this.sessao = {
-        id: gerarId(),
+        id,
         iniciadaEm: agora,
         encerradaEm: null,
         snapshotInicial: snapshot,
@@ -97,48 +122,38 @@ export class DiagnosticoService {
         eventos: [],
         lacunas: [],
         ultimaAtividadeIso: agora,
+        simulacao,
       };
 
-      // 4. Eventos obrigatórios do ciclo de sessão
+      // 4. Resultado individual de cada coletor disponível
       this.sessao.eventos.push(
         this.criarEvento(
           'session_started',
           'Sessão de diagnóstico iniciada',
-          usbOk
-            ? this.usb.resumo(snapshot)
-            : 'Sem enumeração USB disponível',
+          usbOk ? this.usb.resumo(snapshot) : (snapshot?.erro ?? 'Sem enumeração USB disponível'),
           'api',
           'info'
         )
       );
-
-      if (usbOk) {
-        this.sessao.eventos.push(
-          this.criarEvento(
-            'collector_started',
-            'Coletor USB iniciado',
-            'UsbManager getDeviceList + getAccessoryList (somente leitura)',
-            'api',
-            'info'
-          )
-        );
+      this.sessao.eventos.push(
+        this.criarEvento(
+          usbOk ? 'collector_started' : 'collector_failed',
+          usbOk ? 'Coletor USB iniciado' : 'Coletor USB não iniciado',
+          simulacao
+            ? 'enumeração: snapshot sintético vazio (simulation=true) — nenhuma API USB real foi lida'
+            : `enumeração: ${usbOk ? 'UsbManager getDeviceList + getAccessoryList (somente leitura)' : (snapshot?.erro ?? 'plugin nativo indisponível')}`,
+          'api',
+          usbOk ? 'info' : 'erro'
+        )
+      );
+      if (snapshot) {
         this.sessao.eventos.push(
           this.criarEvento(
             'initial_snapshot',
-            'Snapshot inicial de USB capturado',
-            `${snapshot?.dispositivos.length ?? 0} dispositivo(s), ${snapshot?.acessorios.length ?? 0} acessório(s)`,
+            'Snapshot inicial persistido',
+            `${snapshot.dispositivos.length} dispositivo(s), ${snapshot.acessorios.length} acessório(s)${snapshot.erro ? ` — ${snapshot.erro}` : ''}`,
             'api',
-            'info'
-          )
-        );
-      } else {
-        this.sessao.eventos.push(
-          this.criarEvento(
-            'collector_failed',
-            'Coletor USB não iniciado',
-            snapshot?.erro ?? 'Plugin nativo indisponível',
-            'api',
-            'erro'
+            snapshot.erro ? 'aviso' : 'info'
           )
         );
       }
@@ -146,22 +161,44 @@ export class DiagnosticoService {
       this.appLog.log(`diagnóstico ${this.sessao.id} iniciado`, 'info');
       this.persistir();
 
-      // 5. Inicia observação de mudanças USB (se nativo disponível)
-      if (pluginNativoDisponivel() && !this.observando) {
-        try {
+      // 5. Coletor de eventos USB: só a captura real registra o receiver.
+      // Simulação nunca toca o plugin nativo nem lê USB real.
+      let observadorOk = false;
+      let motivoObservador = simulacao
+        ? 'não aplicável — simulação não registra receiver nativo'
+        : 'plugin nativo indisponível';
+      try {
+        if (!simulacao && pluginNativoDisponivel() && !this.usb.observando) {
           await this.usb.iniciarObservacao();
-          this.observando = true;
-          this.usb.mudancas.subscribe((m) => {
-            void this.registrarMudancaUsb(m);
-          });
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          this.appLog.log(`não foi possível iniciar observação USB: ${msg}`, 'aviso');
-          await this.registrarFalhaObservacao('observação USB', msg);
         }
+        observadorOk = !simulacao && this.usb.observando;
+        if (!simulacao) {
+          motivoObservador = observadorOk
+            ? 'receiver dinâmico registrado para ACTION_USB_*_ATTACHED/DETACHED'
+            : 'receiver dinâmico NÃO registrado — eventos de hotplug não serão observados';
+        }
+      } catch (e) {
+        motivoObservador = e instanceof Error ? e.message : String(e);
+        this.appLog.log(`não foi possível iniciar observação USB: ${motivoObservador}`, 'erro');
       }
+      this.observando = observadorOk;
+      this.sessao.eventos.push(
+        this.criarEvento(
+          observadorOk ? 'collector_started' : 'collector_failed',
+          simulacao
+            ? 'Coletor de eventos USB não aplicável (simulação)'
+            : (observadorOk ? 'Coletor de eventos USB iniciado' : 'Coletor de eventos USB não iniciado'),
+          `observação: ${motivoObservador}`,
+          'api',
+          simulacao ? 'aviso' : (observadorOk ? 'info' : 'erro')
+        )
+      );
+      this.persistir();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      if (!this.sessao) {
+        this.usb.sessaoIdAtiva = null;
+      }
       this.erro = `Falha ao iniciar diagnóstico: ${msg}`;
       this.appLog.log(this.erro, 'erro');
       if (this.sessao) {
@@ -178,8 +215,14 @@ export class DiagnosticoService {
     tipo: string;
     rotulo: string;
     detalhe: string;
+    simulacao?: boolean;
   }): Promise<void> {
-    if (!this.sessao) {
+    const sessao = this.sessao;
+    if (!sessao) {
+      return;
+    }
+    if (!!m.simulacao !== !!sessao.simulacao) {
+      this.appLog.log('mudança USB ignorada: origem diferente da sessão ativa', 'aviso');
       return;
     }
     await this.registrarEvento(
@@ -187,10 +230,15 @@ export class DiagnosticoService {
       m.rotulo,
       m.detalhe,
       'api',
-      m.tipo === 'usb_conectado' ? 'info' : 'aviso'
+      m.tipo === 'usb_conectado' ? 'info' : 'aviso',
+      !!sessao.simulacao
     );
-    // Re-enumera para refletir novo estado e identificar equipamento
+    // Re-enumera para refletir novo estado e identificar equipamento.
+    // Em simulação isso leria USB real: nunca misturar fontes na mesma sessão.
     try {
+      if (sessao.simulacao) {
+        return;
+      }
       const snapshot = await this.usb.enumerar();
       if (snapshot) {
         for (const d of snapshot.dispositivos) {
@@ -227,6 +275,14 @@ export class DiagnosticoService {
 
       this.sessao.encerradaEm = new Date().toISOString();
       this.sessao.ultimaAtividadeIso = this.sessao.encerradaEm;
+      for (const lacuna of this.sessao.lacunas) {
+        if (lacuna.fimIso === null) {
+          lacuna.fimIso = this.sessao.encerradaEm;
+          this.sessao.eventos.push(
+            this.criarEvento('lacuna_fim', 'Lacuna encerrada com a sessão', lacuna.motivo, 'api', 'aviso')
+          );
+        }
+      }
       this.sessao.eventos.push(
         this.criarEvento('session_ended', 'Diagnóstico encerrado', undefined, 'api')
       );
@@ -249,6 +305,7 @@ export class DiagnosticoService {
 
       // Limpa sessão ativa apenas APÓS persistir no histórico
       this.sessao = null;
+      this.usb.sessaoIdAtiva = null;
       try {
         localStorage.removeItem(`autolink.${CHAVE_ATIVA}`);
       } catch {
@@ -265,9 +322,16 @@ export class DiagnosticoService {
     rotulo: string,
     detalhe?: string,
     origem: Origem = 'api',
-    severidade: 'info' | 'aviso' | 'erro' = 'info'
+    severidade: 'info' | 'aviso' | 'erro' = 'info',
+    simulacao?: boolean
   ): Promise<void> {
     if (!this.sessao) {
+      return;
+    }
+    // Chamadas internas omitem o parâmetro e herdam a origem da sessão;
+    // só uma origem explicitamente diferente é rejeitada.
+    if (simulacao !== undefined && simulacao !== !!this.sessao.simulacao) {
+      this.appLog.log('evento ignorado: origem diferente da sessão ativa', 'aviso');
       return;
     }
     const evento = this.criarEvento(tipo, rotulo, detalhe, origem);
@@ -298,28 +362,57 @@ export class DiagnosticoService {
     await this.registrarEvento('observacao', 'Observação', t, 'manual', 'aviso');
   }
 
-  /** Reenumerar interfaces ao voltar do primeiro plano (indica lacunas). */
+  /** Registra honestamente a perda de observação ao sair do primeiro plano. */
+  async registrarSaidaParaSegundoPlano(): Promise<void> {
+    if (!this.sessao || this.sessao.encerradaEm) {
+      return;
+    }
+    if (this.sessao.lacunas.some((l) => l.fimIso === null)) {
+      return;
+    }
+    this.sessao.lacunas.push({
+      inicioIso: new Date().toISOString(),
+      fimIso: null,
+      motivo: 'aplicativo em segundo plano — coleta contínua não garantida',
+    });
+    await this.registrarEvento(
+      'lacuna_inicio',
+      'Aplicativo em segundo plano',
+      'Android Auto pode assumir a tela; eventos durante a pausa podem não ser observados',
+      'api',
+      'aviso'
+    );
+  }
+
+  /** Reenumerar interfaces ao voltar do primeiro plano e fechar a lacuna. */
   async reenumerarAoRetornar(): Promise<void> {
-    if (!this.sessao) {
+    if (!this.sessao || this.sessao.encerradaEm) {
       return;
     }
     try {
-      const snapshot = await this.usb.enumerar();
-      if (snapshot) {
-        for (const d of snapshot.dispositivos) {
-          this.identificacao.registrarUsbDispositivo(d);
-        }
-        for (const a of snapshot.acessorios) {
-          this.identificacao.registrarUsbAcessorio(a);
+      if (!this.sessao.simulacao) {
+        const snapshot = await this.usb.enumerar();
+        if (snapshot) {
+          for (const d of snapshot.dispositivos) {
+            this.identificacao.registrarUsbDispositivo(d);
+          }
+          for (const a of snapshot.acessorios) {
+            this.identificacao.registrarUsbAcessorio(a);
+          }
         }
       }
-      await this.registrarEvento(
-        'app_evento',
-        'aplicativo voltou ao primeiro plano',
-        'interfaces re-enumeradas',
-        'api',
-        'info'
-      );
+      const abertas = this.sessao.lacunas.filter((l) => l.fimIso === null);
+      const fimIso = new Date().toISOString();
+      for (const lacuna of abertas) {
+        lacuna.fimIso = fimIso;
+      }
+      const detalhe = this.sessao.simulacao
+        ? 'lacuna encerrada; nenhuma interface real foi re-enumerada nesta simulação'
+        : (abertas.length > 0
+          ? `${abertas.length} lacuna(s) encerrada(s); interfaces re-enumeradas`
+          : 'interfaces re-enumeradas');
+      await this.registrarEvento('lacuna_fim', 'Aplicativo voltou ao primeiro plano', detalhe, 'api', 'info');
+      await this.registrarEvento('app_evento', 'aplicativo voltou ao primeiro plano', detalhe, 'api', 'info');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await this.registrarFalhaObservacao('reenumerar ao retornar', msg);
@@ -337,6 +430,17 @@ export class DiagnosticoService {
     } catch {
       return null;
     }
+  }
+
+  /** Resolve exatamente a sessão pedida; sem ID mantém o comportamento antigo. */
+  obterSessao(id?: string): Sessao | null {
+    if (!id) {
+      return this.sessaoParaExport();
+    }
+    if (this.sessao?.id === id) {
+      return this.sessao;
+    }
+    return this.historicoParaExport().find((s) => s.id === id) ?? null;
   }
 
   /** Retorna todo o histórico de sessões. */
@@ -380,6 +484,7 @@ export class DiagnosticoService {
       timestampIso: d.toISOString(),
       timezoneOffsetMin: -d.getTimezoneOffset(),
       monotonicMs: monotonicMs ?? Math.round(performance.now()),
+      simulacao: !!this.sessao?.simulacao,
     };
   }
 

@@ -17,7 +17,7 @@
       <h2 class="titulo-secao">Último diagnóstico</h2>
       <p class="dado">{{ ultimoDiagnosticoFormatado }}</p>
       <ion-button expand="block" (click)="continuarDiagnostico()">
-        Continuar diagnóstico
+        {{ diagnostico.sessao ? 'Continuar diagnóstico' : 'Ver último diagnóstico' }}
       </ion-button>
     </div>
 
@@ -35,7 +35,7 @@
       expand="block"
       size="large"
       shape="round"
-      [disabled]="diagnostico.processando || temUltimoDiagnostico"
+      [disabled]="diagnostico.processando"
       (click)="iniciarDiagnostico()"
     >
       {{ diagnostico.processando ? 'Iniciando…' : 'Iniciar diagnóstico' }}

@@ -37,7 +37,14 @@ export class InicioPage {
   }
 
   async continuarDiagnostico(): Promise<void> {
-    await this.router.navigate(['/diagnostico']);
+    if (this.diagnostico.sessao) {
+      await this.router.navigate(['/diagnostico']);
+      return;
+    }
+    const ultimo = this.ultimoDiagnostico;
+    if (ultimo) {
+      await this.router.navigate(['/resultado', ultimo.id]);
+    }
   }
 
   formatarDuracao(seg: number): string {
