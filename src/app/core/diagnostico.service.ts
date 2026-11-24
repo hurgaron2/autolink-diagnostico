@@ -1,12 +1,22 @@
 import { Injectable } from '@angular/core';
 import { AppLogService } from './app-log.service';
 import { DeviceInfoService } from './device-info.service';
-import { Evento, EventoTipo, Origem, PhoneInfo, Sessao, UsbSnapshot } from './models';
+import {
+  Evento,
+  EventoTipo,
+  Lacuna,
+  Origem,
+  PhoneInfo,
+  Sessao,
+  UsbSnapshot,
+} from './models';
 import { AutoLink, pluginNativoDisponivel } from './plugin';
 import { UsbService } from './usb.service';
 import { IdentificacaoService } from './identificacao.service';
 
 const CHAVE_ATIVA = 'diagnostico.sessao.ativa';
+const CHAVE_HISTORICO = 'diagnostico.historico';
+const MAX_HISTORICO = 50;
 
 function gerarId(): string {
   const c = globalThis.crypto as Crypto | undefined;
@@ -19,7 +29,7 @@ function gerarId(): string {
 /**
  * Sessão de diagnóstico automático: linha do tempo com eventos observados
  * (USB, Bluetooth, rede, app), snapshot inicial e dados do telefone.
- * Persistida em localStorage durante a reprodução.
+ * Persistida em localStorage durante a reprodução; sem serviço em segundo plano.
  */
 @Injectable({ providedIn: 'root' })
 export class DiagnosticoService {
@@ -42,11 +52,22 @@ export class DiagnosticoService {
     }
     this.processando = true;
     this.erro = null;
+    let snapshot: UsbSnapshot | null = null;
+    let usbOk = false;
+
     try {
-      const snapshot = await this.executarComTimeout(
-        () => this.usb.enumerar(),
-        'enumeração USB'
-      );
+      // 1. Snapshot inicial de USB
+      try {
+        snapshot = await this.executarComTimeout(
+          () => this.usb.enumerar(),
+          'enumeração USB'
+        );
+        usbOk = snapshot !== null && snapshot.erro === null;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.appLog.log(`USB: falha na enumeração inicial — ${msg}`, 'erro');
+      }
+
       // Registra equipamentos USB identificados
       if (snapshot) {
         for (const d of snapshot.dispositivos) {
@@ -56,12 +77,16 @@ export class DiagnosticoService {
           this.identificacao.registrarUsbAcessorio(a);
         }
       }
+
+      // 2. Dados do telefone
       let phone: PhoneInfo | null = null;
       try {
         phone = await this.device.coletar();
       } catch {
         phone = null;
       }
+
+      // 3. Cria a sessão com startedAt válido ANTES de qualquer coleta posterior
       const agora = new Date().toISOString();
       this.sessao = {
         id: gerarId(),
@@ -73,18 +98,55 @@ export class DiagnosticoService {
         lacunas: [],
         ultimaAtividadeIso: agora,
       };
+
+      // 4. Eventos obrigatórios do ciclo de sessão
       this.sessao.eventos.push(
         this.criarEvento(
-          'diagnostico_iniciado',
-          'Diagnóstico iniciado',
-          this.usb.resumo(snapshot),
-          'api'
+          'session_started',
+          'Sessão de diagnóstico iniciada',
+          usbOk
+            ? this.usb.resumo(snapshot)
+            : 'Sem enumeração USB disponível',
+          'api',
+          'info'
         )
       );
+
+      if (usbOk) {
+        this.sessao.eventos.push(
+          this.criarEvento(
+            'collector_started',
+            'Coletor USB iniciado',
+            'UsbManager getDeviceList + getAccessoryList (somente leitura)',
+            'api',
+            'info'
+          )
+        );
+        this.sessao.eventos.push(
+          this.criarEvento(
+            'initial_snapshot',
+            'Snapshot inicial de USB capturado',
+            `${snapshot?.dispositivos.length ?? 0} dispositivo(s), ${snapshot?.acessorios.length ?? 0} acessório(s)`,
+            'api',
+            'info'
+          )
+        );
+      } else {
+        this.sessao.eventos.push(
+          this.criarEvento(
+            'collector_failed',
+            'Coletor USB não iniciado',
+            snapshot?.erro ?? 'Plugin nativo indisponível',
+            'api',
+            'erro'
+          )
+        );
+      }
+
       this.appLog.log(`diagnóstico ${this.sessao.id} iniciado`, 'info');
       this.persistir();
 
-      // Inicia observação de mudanças USB (se nativo disponível)
+      // 5. Inicia observação de mudanças USB (se nativo disponível)
       if (pluginNativoDisponivel() && !this.observando) {
         try {
           await this.usb.iniciarObservacao();
@@ -95,13 +157,16 @@ export class DiagnosticoService {
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           this.appLog.log(`não foi possível iniciar observação USB: ${msg}`, 'aviso');
-          this.registrarEvento('erro_coleta', 'observação USB indisponível', msg, 'api', 'aviso');
+          await this.registrarFalhaObservacao('observação USB', msg);
         }
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.erro = `Falha ao iniciar diagnóstico: ${msg}`;
       this.appLog.log(this.erro, 'erro');
+      if (this.sessao) {
+        await this.registrarFalhaObservacao('inicialização da sessão', msg);
+      }
       throw e;
     } finally {
       this.processando = false;
@@ -109,7 +174,11 @@ export class DiagnosticoService {
   }
 
   /** Registra uma mudança de conexão USB observada automaticamente. */
-  private async registrarMudancaUsb(m: { tipo: string; rotulo: string; detalhe: string }): Promise<void> {
+  private async registrarMudancaUsb(m: {
+    tipo: string;
+    rotulo: string;
+    detalhe: string;
+  }): Promise<void> {
     if (!this.sessao) {
       return;
     }
@@ -159,17 +228,26 @@ export class DiagnosticoService {
       this.sessao.encerradaEm = new Date().toISOString();
       this.sessao.ultimaAtividadeIso = this.sessao.encerradaEm;
       this.sessao.eventos.push(
-        this.criarEvento('diagnostico_encerrado', 'Diagnóstico encerrado', undefined, 'api')
+        this.criarEvento('session_ended', 'Diagnóstico encerrado', undefined, 'api')
       );
+
+      // Salva no histórico (origem da verdade para o relatório)
       const encerrada = this.sessao;
-      const salvo = lerJson<Sessao[]>('diagnostico.historico', []);
-      const historico = [encerrada, ...salvo].slice(0, 50);
+      const salvo = lerJson<Sessao[]>(CHAVE_HISTORICO, []);
+      const historico = [encerrada, ...salvo].slice(0, MAX_HISTORICO);
+      let gravado = false;
       try {
-        localStorage.setItem(`autolink.${'diagnostico.historico'}`, JSON.stringify(historico));
+        localStorage.setItem(`autolink.${CHAVE_HISTORICO}`, JSON.stringify(historico));
+        gravado = true;
       } catch {
-        // sem espaço: sessão segue em memória
+        // sem espaço: sessão segue apenas em memória
       }
-      this.appLog.log(`diagnóstico ${encerrada.id} encerrado`, 'info');
+
+      this.appLog.log(
+        `diagnóstico ${encerrada.id} encerrado${gravado ? ', persistido' : ', sem persistência'}`, 'info'
+      );
+
+      // Limpa sessão ativa apenas APÓS persistir no histórico
       this.sessao = null;
       try {
         localStorage.removeItem(`autolink.${CHAVE_ATIVA}`);
@@ -220,7 +298,7 @@ export class DiagnosticoService {
     await this.registrarEvento('observacao', 'Observação', t, 'manual', 'aviso');
   }
 
-  /** Reenumerar interfaces ao voltar do segundo plano (indica lacunas). */
+  /** Reenumerar interfaces ao voltar do primeiro plano (indica lacunas). */
   async reenumerarAoRetornar(): Promise<void> {
     if (!this.sessao) {
       return;
@@ -245,6 +323,42 @@ export class DiagnosticoService {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await this.registrarFalhaObservacao('reenumerar ao retornar', msg);
+    }
+  }
+
+  /** Retorna a sessão para exportação: ativa ou a última encerrada no histórico. */
+  sessaoParaExport(): Sessao | null {
+    if (this.sessao) {
+      return this.sessao;
+    }
+    try {
+      const salvo = lerJson<Sessao[]>(CHAVE_HISTORICO, []);
+      return salvo.length > 0 ? salvo[0] : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Retorna todo o histórico de sessões. */
+  historicoParaExport(): Sessao[] {
+    try {
+      return lerJson<Sessao[]>(CHAVE_HISTORICO, []);
+    } catch {
+      return [];
+    }
+  }
+
+  /** Exclui uma sessão do histórico pelo ID. */
+  async excluirSessao(id: string): Promise<void> {
+    try {
+      const salvo = lerJson<Sessao[]>(CHAVE_HISTORICO, []);
+      const filtrada = salvo.filter((s) => s.id !== id);
+      localStorage.setItem(`autolink.${CHAVE_HISTORICO}`, JSON.stringify(filtrada));
+      this.appLog.log(`sessão ${id} excluída do histórico`, 'info');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.appLog.log(`falha ao excluir sessão ${id}: ${msg}`, 'erro');
+      throw e;
     }
   }
 

@@ -20,11 +20,27 @@ describe('DiagnosticoService', () => {
     localStorage.clear();
   });
 
-  it('inicia sessão com snapshot e evento de diagnóstico iniciado', async () => {
+  it('inicia sessão com evento session_started e collector_started/failed', async () => {
     await service.iniciar();
     expect(service.sessao).not.toBeNull();
-    expect(service.sessao?.eventos.some((e) => e.tipo === 'diagnostico_iniciado')).toBe(true);
+    expect(service.sessao?.eventos.some((e) => e.tipo === 'session_started')).toBe(true);
+    // Um coletor USB sempre deve ser reportado (started ou failed)
+    expect(
+      service.sessao?.eventos.some(
+        (e) => e.tipo === 'collector_started' || e.tipo === 'collector_failed'
+      )
+    ).toBe(true);
     expect(localStorage.getItem('autolink.diagnostico.sessao.ativa')).toBeTruthy();
+    expect(service.sessao?.iniciadaEm).toBeTruthy();
+    expect(Date.parse(service.sessao!.iniciadaEm)).not.toBeNaN();
+  });
+
+  it('registra initial_snapshot quando a enumeração USB tem sucesso, ou collector_failed quando falha', async () => {
+    await service.iniciar();
+    const temSucesso = service.sessao?.eventos.some((e) => e.tipo === 'initial_snapshot');
+    const temFalha = service.sessao?.eventos.some((e) => e.tipo === 'collector_failed');
+    // Pelo menos um dos dois deve estar presente: snapshot capturado ou coletor falhou
+    expect(temSucesso || temFalha).toBe(true);
   });
 
   it('registra eventos na linha do tempo da sessão', async () => {
@@ -41,6 +57,7 @@ describe('DiagnosticoService', () => {
     const historico = lerJson('diagnostico.historico', [] as any[]);
     expect(historico.length).toBe(1);
     expect((historico[0] as any).encerradaEm).not.toBeNull();
+    expect((historico[0] as any).eventos.some((e: any) => e.tipo === 'session_ended')).toBe(true);
   });
 
   it('não permite iniciar sessão duplicada', async () => {
@@ -52,6 +69,15 @@ describe('DiagnosticoService', () => {
 
   it('duracaoSegundos retorna 0 sem sessão', () => {
     expect(service.duracaoSegundos).toBe(0);
+  });
+
+  it('sessaoParaExport retorna a última sessão encerrada quando não há ativa', async () => {
+    expect(service.sessaoParaExport()).toBeNull();
+    await service.iniciar();
+    await service.encerrar();
+    const exportada = service.sessaoParaExport();
+    expect(exportada).not.toBeNull();
+    expect(exportada?.encerradaEm).not.toBeNull();
   });
 });
 

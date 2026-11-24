@@ -64,5 +64,10 @@
     <queries>
         <package android:name="com.google.android.gms" />
         <package android:name="com.google.android.projection.gearhead" />
+        <!-- Necessario para resolveActivity() enxergar o DocumentsUI. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="vnd.android.document/directory" />
+        </intent>
     </queries>
 </manifest>

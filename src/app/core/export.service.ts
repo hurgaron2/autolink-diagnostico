@@ -1,22 +1,21 @@
 import { Injectable } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
-import { Share } from '@capacitor/share';
 import JSZip from 'jszip';
 import { AppLogService } from './app-log.service';
 import { CentralService } from './central.service';
 import { DeviceInfoService } from './device-info.service';
-import { Evento } from './models';
+import { Evento, PhoneInfo, SCHEMA_VERSION, Sessao, UsbSnapshot } from './models';
+import { DiagnosticoService } from './diagnostico.service';
 import { IdentificacaoService } from './identificacao.service';
 import { LogImportService } from './log-import.service';
-import { PhoneInfo, SCHEMA_VERSION, Sessao, UsbSnapshot } from './models';
 import { AVISO_SANITIZACAO, sanitizar } from './sanitize';
-import { SessionService } from './session.service';
 import { StorageService } from './storage.service';
+import { StoragePublicService } from './storage-public.service';
 import { UsbService } from './usb.service';
 
 const APP_NOME = 'AutoLink Diagnóstico';
 const APP_ID = 'com.autolink.diagnostico';
-const APP_VERSAO = '0.0.1';
+const APP_VERSAO = '1.5';
 
 export interface OpcoesExport {
   incluirLogs: boolean;
@@ -68,12 +67,13 @@ export class ExportService {
   constructor(
     private device: DeviceInfoService,
     private central: CentralService,
-    private session: SessionService,
+    private diagnostico: DiagnosticoService,
     private usb: UsbService,
     private logs: LogImportService,
     private appLog: AppLogService,
     private storage: StorageService,
-    private identificacao: IdentificacaoService
+    private identificacao: IdentificacaoService,
+    private storagePublic: StoragePublicService
   ) {}
 
   /** Constrói os arquivos do ZIP (testável sem compartilhamento). */
@@ -93,7 +93,7 @@ export class ExportService {
       avisos.push('Falha ao coletar o painel do telefone para o export.');
     }
 
-    const sessao: Sessao | null = this.session.sessaoParaExport();
+    const sessao: Sessao | null = this.diagnostico.sessaoParaExport();
     if (!sessao) {
       avisos.push('Nenhuma sessão de diagnóstico registrada.');
     }
@@ -171,9 +171,9 @@ export class ExportService {
 
     arquivos['timeline.json'] = JSON.stringify(
       {
-        sessaoAtiva: this.session.sessao !== null,
+        sessaoAtiva: this.diagnostico.sessao !== null,
         sessao,
-        historicoRecente: this.session.historico.slice(0, 5),
+        historicoRecente: this.diagnostico.historicoParaExport().slice(0, 5),
         nota: 'monotonicMs ordena eventos mesmo com mudança de relógio; timezoneOffsetMin indica o fuso local.',
       },
       null,
@@ -308,38 +308,41 @@ export class ExportService {
       const bytes: Uint8Array = r2.valor;
       const nomeArquivo = `autolink-diagnostico-${compactarData()}.zip`;
 
-      // 3. Gravação no cache do dispositivo (apenas nativo)
-      let uri: string | null = null;
+      // 3. Gravação em Downloads público (apenas nativo)
+      let uriPublico: string | null = null;
+      let caminhoPublico: string | null = null;
       if (Capacitor.isNativePlatform()) {
+        const sessao = this.diagnostico.sessaoParaExport();
+        const idSessao = sessao?.id ?? 'sem-sessao';
+        const dadosBase64 = bytesToBase64(bytes);
         const r3 = await this.executarEtapa('gravacao', () =>
-          this.storage.salvarCacheBase64(nomeArquivo, bytesToBase64(bytes))
+          this.storagePublic.salvar(nomeArquivo, dadosBase64, idSessao)
         );
         if (!r3.ok || !r3.valor) {
-          this.estado.erro = `Falha ao gravar o ZIP no cache do dispositivo: ${r3.erro ?? 'sem URI'}`;
+          // Falha na gravação pública: preserva ZIP em memória e avisa, mas não bloqueia
+          this.appLog.log(`gravação pública falhou: ${r3.valor?.erro ?? r3.erro}`, 'aviso');
+          this.estado.erro = `Falha ao gravar em Downloads público: ${r3.valor?.erro ?? r3.erro}`;
           return { ok: false, mensagem: this.estado.erro };
         }
-        uri = r3.valor;
+        uriPublico = r3.valor.uri ?? null;
+        caminhoPublico = r3.valor.caminho ?? null;
       }
 
       this.estado.arquivoGerado = nomeArquivo;
-      this.estado.uri = uri;
+      this.estado.uri = uriPublico;
 
       // 4. Compartilhamento (opcional: se cancelado, não é perda do arquivo)
-      if (Capacitor.isNativePlatform() && uri) {
+      if (Capacitor.isNativePlatform() && uriPublico) {
         const r4 = await this.executarEtapa('compartilhamento', () =>
-          Share.share({
-            files: [uri],
-            title: 'Exportar diagnóstico AutoLink',
-            dialogTitle: 'Compartilhar pacote de diagnóstico',
-          })
+          this.storagePublic.compartilhar(uriPublico)
         );
         if (!r4.ok) {
-          // Usuário cancelou ou falha no share: o arquivo continua disponível.
+          // Usuário cancelou ou falha no share: o arquivo continua disponível em Downloads público
           this.appLog.log(`compartilhamento não concluído: ${r4.erro}`, 'aviso');
           this.estado.erro = null;
           return {
             ok: true,
-            mensagem: `Pacote gerado: ${nomeArquivo} (compartilhamento não concluído, arquivo disponível)`,
+            mensagem: `Pacote gerado em ${caminhoPublico ?? nomeArquivo} (compartilhamento não concluído, arquivo disponível)`,
           };
         }
         this.appLog.log(`diagnóstico exportado (${nomeArquivo}, ${bytes.length} bytes)`, 'info');
@@ -347,37 +350,45 @@ export class ExportService {
       }
 
       // Navegador (dev): compartilhar via Web Share API ou baixar.
-      const r5 = await this.executarEtapa('compartilhamento', async () => {
-        const file = new File([bytes as unknown as BlobPart], nomeArquivo, { type: 'application/zip' });
-        const nav = navigator as Navigator & {
-          canShare?: (d: ShareData) => boolean;
-          share?: (d: ShareData) => Promise<void>;
-        };
-        if (nav.share && nav.canShare?.({ files: [file] })) {
-          await nav.share({ files: [file], title: 'Exportar diagnóstico AutoLink' });
-          return 'compartilhado';
+      if (!Capacitor.isNativePlatform()) {
+        const r5 = await this.executarEtapa('compartilhamento', async () => {
+          const file = new File([bytes as unknown as BlobPart], nomeArquivo, { type: 'application/zip' });
+          const nav = navigator as Navigator & {
+            canShare?: (d: ShareData) => boolean;
+            share?: (d: ShareData) => Promise<void>;
+          };
+          if (nav.share && nav.canShare?.({ files: [file] })) {
+            await nav.share({ files: [file], title: 'Exportar diagnóstico AutoLink' });
+            return 'compartilhado';
+          }
+          const url = URL.createObjectURL(file);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = nomeArquivo;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          return 'baixado';
+        });
+        if (!r5.ok) {
+          this.appLog.log(`compartilhamento não concluído no navegador: ${r5.erro}`, 'aviso');
+          return {
+            ok: true,
+            mensagem: `Pacote gerado: ${nomeArquivo} (compartilhamento não concluído, arquivo disponível)`,
+          };
         }
-        const url = URL.createObjectURL(file);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = nomeArquivo;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
-        return 'baixado';
-      });
-      if (!r5.ok) {
-        this.appLog.log(`compartilhamento não concluído no navegador: ${r5.erro}`, 'aviso');
-        return {
-          ok: true,
-          mensagem: `Pacote gerado: ${nomeArquivo} (compartilhamento não concluído, arquivo disponível)`,
-        };
+
+        this.appLog.log(
+          `diagnóstico ${r5.valor === 'baixado' ? 'baixado' : 'compartilhado'} via navegador (${nomeArquivo})`,
+          'info'
+        );
+        return { ok: true, mensagem: `Pacote gerado: ${nomeArquivo}` };
       }
 
-      this.appLog.log(
-        `diagnóstico ${r5.valor === 'baixado' ? 'baixado' : 'compartilhado'} via navegador (${nomeArquivo})`,
-        'info'
-      );
-      return { ok: true, mensagem: `Pacote gerado: ${nomeArquivo}` };
+      // Sem plataforma nativa e sem URI pública: arquivo só existe em memória
+      return {
+        ok: true,
+        mensagem: `Pacote gerado em memória: ${nomeArquivo} (sem gravação pública nesta plataforma)`,
+      };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.estado.erro = msg;

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { DiagnosticoService } from '../../core/diagnostico.service';
 import { Sessao } from '../../core/models';
 import { Router } from '@angular/router';
@@ -13,7 +13,7 @@ import { StorageService } from '../../core/storage.service';
   styleUrls: ['./historico.page.scss'],
   standalone: false,
 })
-export class HistoricoPage {
+export class HistoricoPage implements OnInit {
   historico: Sessao[] = [];
   carregando = false;
   excluindoId: string | null = null;
@@ -26,6 +26,10 @@ export class HistoricoPage {
     private storage: StorageService
   ) {}
 
+  ngOnInit(): void {
+    void this.carregarHistorico();
+  }
+
   async ionViewWillEnter(): Promise<void> {
     await this.carregarHistorico();
   }
@@ -33,8 +37,7 @@ export class HistoricoPage {
   async carregarHistorico(): Promise<void> {
     this.carregando = true;
     try {
-      const raw = localStorage.getItem('autolink.diagnostico.historico');
-      this.historico = raw ? (JSON.parse(raw) as Sessao[]) : [];
+      this.historico = this.diagnostico.historicoParaExport();
     } catch {
       this.historico = [];
     } finally {
@@ -121,11 +124,7 @@ export class HistoricoPage {
     }
     this.excluindoId = sessao.id;
     try {
-      const raw = localStorage.getItem('autolink.diagnostico.historico');
-      if (!raw) return;
-      const lista = JSON.parse(raw) as Sessao[];
-      const filtrada = lista.filter((s) => s.id !== sessao.id);
-      localStorage.setItem('autolink.diagnostico.historico', JSON.stringify(filtrada));
+      await this.diagnostico.excluirSessao(sessao.id);
       await this.carregarHistorico();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

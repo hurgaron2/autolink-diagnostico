@@ -9,64 +9,92 @@
 
 <ion-content class="ion-padding">
   <div class="tela-resultado">
-    <!-- Título -->
-    <h1 *ngIf="concluido">Diagnóstico concluído</h1>
-    <h1 *ngIf="!concluido">Diagnóstico salvo</h1>
-
-    <div class="bloco-info">
-      <div class="item-info">
-        <span class="label">Data</span>
-        <span class="valor">{{ sessao?.iniciadaEm?.slice(0, 16).replace('T', ' ') ?? '—' }}</span>
-      </div>
-      <div class="item-info">
-        <span class="label">Duração</span>
-        <span class="valor">{{ duracaoFormatada }}</span>
-      </div>
-      <div class="item-info">
-        <span class="label">Eventos</span>
-        <span class="valor">{{ sessao?.eventos.length ?? 0 }}</span>
-      </div>
-      <div class="item-info">
-        <span class="label">Estado</span>
-        <span class="valor">{{ concluido ? 'Concluído' : 'Interrompido' }}</span>
-      </div>
+    <!-- Erro de carregamento -->
+    <div *ngIf="erroCarregamento" class="aviso-erro">
+      <h3>{{ erroCarregamento }}</h3>
+      <ion-button expand="block" fill="outline" color="danger" (click)="novoDiagnostico()">
+        Novo diagnóstico
+      </ion-button>
     </div>
 
-    <!-- Limitações -->
-    <div *ngIf="temLimitacoes" class="aviso-limitacao">
-      <h3>Diagnóstico salvo com limitações</h3>
-      <p>Alguma fonte de observação não pôde ser acessada durante a coleta. Os registros foram salvos com os dados disponíveis.</p>
+    <!-- Sem sessão -->
+    <div *ngIf="!erroCarregamento && !sessao" class="aviso-sem-sessao">
+      <h3>Nenhum diagnóstico encontrado</h3>
+      <p>Inicie um diagnóstico na tela Início para gerar registros.</p>
+      <ion-button expand="block" color="primary" (click)="novoDiagnostico()">
+        Iniciar diagnóstico
+      </ion-button>
     </div>
 
-    <div *ngIf="!temLimitacoes && concluido" class="aviso-sucesso">
-      <h3>Registros salvos</h3>
-      <p>Os registros do diagnóstico foram salvos com sucesso. Não foi possível determinar a causa do problema automaticamente.</p>
+    <!-- Resultado válido -->
+    <div *ngIf="!erroCarregamento && sessao" class="resultado-valido">
+      <!-- Título -->
+      <h1 *ngIf="concluido">Diagnóstico concluído</h1>
+      <h1 *ngIf="!concluido">Diagnóstico salvo</h1>
+
+      <div class="bloco-info">
+        <div class="item-info">
+          <span class="label">Data</span>
+          <span class="valor">{{ dataFormatada }}</span>
+        </div>
+        <div class="item-info">
+          <span class="label">Duração</span>
+          <span class="valor">{{ duracaoFormatada }}</span>
+        </div>
+        <div class="item-info">
+          <span class="label">Eventos</span>
+          <span class="valor">{{ sessao.eventos.length }}</span>
+        </div>
+        <div class="item-info">
+          <span class="label">Estado</span>
+          <span class="valor">{{ concluido ? 'Concluído' : 'Interrompido' }}</span>
+        </div>
+        <div class="item-info">
+          <span class="label">Coletores</span>
+          <span class="valor">{{ temColetores ? 'Iniciados' : 'Não iniciados' }}</span>
+        </div>
+        <div class="item-info">
+          <span class="label">Snapshot USB</span>
+          <span class="valor">{{ temSnapshot ? 'Capturado' : 'Não capturado' }}</span>
+        </div>
+      </div>
+
+      <!-- Limitações -->
+      <div *ngIf="temLimitacoes" class="aviso-limitacao">
+        <h3>Diagnóstico salvo com limitações</h3>
+        <p>Alguma fonte de observação não pôde ser acessada durante a coleta. Os registros foram salvos com os dados disponíveis.</p>
+      </div>
+
+      <div *ngIf="!temLimitacoes && concluido" class="aviso-sucesso">
+        <h3>Registros salvos</h3>
+        <p>Os registros do diagnóstico foram salvos com sucesso. Não foi possível determinar a causa do problema automaticamente.</p>
+      </div>
+
+      <div *ngIf="!concluido" class="aviso-interrompido">
+        <h3>Diagnóstico interrompido</h3>
+        <p>A sessão foi finalizada antes de ser concluída. Os eventos registrados até o momento foram preservados.</p>
+      </div>
+
+      <!-- Botão principal -->
+      <ion-button
+        expand="block"
+        size="large"
+        shape="round"
+        color="primary"
+        [disabled]="carregando"
+        (click)="compartilhar()"
+      >
+        {{ carregando ? 'Compartilhando…' : 'Compartilhar relatório' }}
+      </ion-button>
+
+      <!-- Ações secundárias -->
+      <ion-button expand="block" fill="outline" size="small" (click)="verDetalhes()">
+        Ver detalhes técnicos
+      </ion-button>
+
+      <ion-button expand="block" fill="outline" size="small" (click)="novoDiagnostico()">
+        Novo diagnóstico
+      </ion-button>
     </div>
-
-    <div *ngIf="!concluido" class="aviso-interrompido">
-      <h3>Diagnóstico interrompido</h3>
-      <p>A sessão foi finalizada antes de ser concluída. Os eventos registrados até o momento foram preservados.</p>
-    </div>
-
-    <!-- Botão principal -->
-    <ion-button
-      expand="block"
-      size="large"
-      shape="round"
-      color="primary"
-      [disabled]="carregando"
-      (click)="compartilhar()"
-    >
-      {{ carregando ? 'Compartilhando…' : 'Compartilhar relatório' }}
-    </ion-button>
-
-    <!-- Ações secundárias -->
-    <ion-button expand="block" fill="outline" size="small" (click)="verDetalhes()">
-      Ver detalhes técnicos
-    </ion-button>
-
-    <ion-button expand="block" fill="outline" size="small" (click)="novoDiagnostico()">
-      Novo diagnóstico
-    </ion-button>
   </div>
 </ion-content>

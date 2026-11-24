@@ -41,8 +41,13 @@ export class DiagnosticoPage {
   }
 
   async encerrarDiagnostico(): Promise<void> {
+    // Captura o ID ANTES de encerrar: encerrar() define this.diagnostico.sessao = null.
+    const id = this.diagnostico.sessao?.id;
+    if (!id) {
+      return;
+    }
     await this.diagnostico.encerrar();
-    await this.router.navigate(['/resultado', this.diagnostico.sessao?.id ?? '']);
+    await this.router.navigate(['/resultado', id]);
   }
 
   async verDetalhesTecnicos(): Promise<void> {

@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // Registro antes de super.onCreate() conforme documentacao do Capacitor.
         registerPlugin(AutoLinkPlugin.class);
+        registerPlugin(StoragePublicPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

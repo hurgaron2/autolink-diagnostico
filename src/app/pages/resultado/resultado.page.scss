@@ -80,6 +80,42 @@
   line-height: 1.5;
 }
 
+.aviso-erro {
+  padding: 16px;
+  border: 1px solid var(--ion-color-danger);
+  border-radius: 12px;
+  background: rgba(var(--ion-color-danger-rgb, 197, 0, 15), 0.1);
+  color: var(--ion-color-danger);
+}
+
+.aviso-sem-sessao {
+  padding: 16px;
+  border: 1px solid var(--ion-color-step-200);
+  border-radius: 12px;
+  background: var(--ion-color-light);
+  color: var(--ion-color-medium);
+}
+
+.aviso-erro h3,
+.aviso-sem-sessao h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.aviso-erro p,
+.aviso-sem-sessao p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.resultado-valido {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
 ion-button {
   min-height: 56px;
   font-size: 16px;

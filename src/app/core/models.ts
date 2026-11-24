@@ -110,7 +110,12 @@ export type EventoTipo =
   | 'erro_coleta'
   | 'app_evento'
   | 'diagnostico_iniciado'
-  | 'diagnostico_encerrado';
+  | 'diagnostico_encerrado'
+  | 'session_started'
+  | 'session_ended'
+  | 'collector_started'
+  | 'collector_failed'
+  | 'initial_snapshot';
 
 export interface Evento {
   id: string;

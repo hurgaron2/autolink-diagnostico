@@ -1,10 +1,9 @@
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DiagnosticoService } from '../../core/diagnostico.service';
+import { ExportService } from '../../core/export.service';
 import { Sessao } from '../../core/models';
 import { AppLogService } from '../../core/app-log.service';
-import { Share } from '@capacitor/share';
-import { Capacitor } from '@capacitor/core';
 
 @Component({
   selector: 'app-resultado',
@@ -12,36 +11,58 @@ import { Capacitor } from '@capacitor/core';
   styleUrls: ['./resultado.page.scss'],
   standalone: false,
 })
-export class ResultadoPage {
+export class ResultadoPage implements OnInit {
   sessao: Sessao | null = null;
   carregando = false;
+  erroCarregamento: string | null = null;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     public diagnostico: DiagnosticoService,
-    private appLog: AppLogService
+    private exportService: ExportService,
+    private appLog: AppLogService,
+    private cdr: ChangeDetectorRef
   ) {}
 
+  ngOnInit(): void {
+    void this.ionViewWillEnter();
+  }
+
   async ionViewWillEnter(): Promise<void> {
+    this.erroCarregamento = null;
     const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
+    if (id && id.length > 0) {
       await this.carregarResultado(id);
-    } else if (this.diagnostico.sessao) {
-      // Sessão ainda em memória (não foi encerrada)
-      this.sessao = this.diagnostico.sessao;
+    } else {
+      // Sem id na rota: tenta usar a sessão ativa ou a última do histórico.
+      if (this.diagnostico.sessao) {
+        this.sessao = this.diagnostico.sessao;
+      } else {
+        const historico = this.diagnostico.historicoParaExport();
+        if (historico.length > 0) {
+          this.sessao = historico[0];
+        } else {
+          this.erroCarregamento =
+            'Nenhum diagnóstico encontrado. Inicie um novo diagnóstico na tela Início.';
+        }
+      }
     }
   }
 
   async carregarResultado(id: string): Promise<void> {
     this.carregando = true;
+    this.erroCarregamento = null;
     try {
-      const raw = localStorage.getItem('autolink.diagnostico.historico');
-      if (raw) {
-        const lista = JSON.parse(raw) as Sessao[];
-        this.sessao = lista.find((s) => s.id === id) ?? null;
+      const historico = this.diagnostico.historicoParaExport();
+      this.sessao = historico.find((s) => s.id === id) ?? null;
+      if (!this.sessao) {
+        this.erroCarregamento = 'Diagnóstico não encontrado no histórico.';
       }
-    } catch {
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.erroCarregamento = `Falha ao carregar diagnóstico: ${msg}`;
+      this.appLog.log(`falha ao carregar diagnóstico: ${msg}`, 'erro');
       this.sessao = null;
     } finally {
       this.carregando = false;
@@ -54,6 +75,18 @@ export class ResultadoPage {
 
   get temLimitacoes(): boolean {
     return this.sessao?.eventos.some((e) => e.tipo === 'erro_coleta') ?? false;
+  }
+
+  get temColetores(): boolean {
+    if (!this.sessao) return false;
+    return this.sessao.eventos.some(
+      (e) => e.tipo === 'collector_started' || e.tipo === 'collector_failed'
+    );
+  }
+
+  get temSnapshot(): boolean {
+    if (!this.sessao) return false;
+    return this.sessao.eventos.some((e) => e.tipo === 'initial_snapshot');
   }
 
   formatarDuracao(seg: number): string {
@@ -69,6 +102,11 @@ export class ResultadoPage {
     return this.formatarDuracao(this.duracaoSegundos(this.sessao));
   }
 
+  get dataFormatada(): string {
+    if (!this.sessao) return '—';
+    return this.sessao.iniciadaEm.slice(0, 16).replace('T', ' ');
+  }
+
   private duracaoSegundos(s: Sessao): number {
     if (!s) return 0;
     const fim = s.encerradaEm ?? new Date().toISOString();
@@ -79,45 +117,29 @@ export class ResultadoPage {
   }
 
   async compartilhar(): Promise<void> {
+    if (!this.sessao) {
+      this.erroCarregamento = 'Não há diagnóstico para compartilhar.';
+      return;
+    }
     this.carregando = true;
+    this.erroCarregamento = null;
     try {
-      const texto = [
-        `AutoLink Diagnóstico — Relatório`,
-        `Data: ${this.sessao?.iniciadaEm}`,
-        `Duração: ${this.duracaoFormatada}`,
-        `Eventos: ${this.sessao?.eventos.length ?? 0}`,
-        `Estado: ${this.concluido ? 'concluído' : 'interrompido'}`,
-        '',
-        'Eventos:',
-        ...(this.sessao?.eventos.map((e) => `  - ${e.timestampIso} [${e.origem}] ${e.rotulo}`) ?? []),
-      ].join('\n');
-
-      const file = new File([texto], `autolink-diagnostico-${this.sessao?.id}.txt`, { type: 'text/plain' });
-
-      if (Capacitor.isNativePlatform()) {
-        await Share.share({
-          text: texto,
-          title: 'Relatório de diagnóstico AutoLink',
-          dialogTitle: 'Compartilhar relatório',
-        });
+      const r = await this.exportService.gerar({
+        incluirLogs: false,
+        sanitizar: true,
+      });
+      if (r.ok) {
+        this.appLog.log(`relatório compartilhado: ${r.mensagem}`, 'info');
       } else {
-        const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
-        if (nav.share) {
-          await nav.share({ files: [file], title: 'Relatório de diagnóstico AutoLink' });
-        } else {
-          const url = URL.createObjectURL(file);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = file.name;
-          a.click();
-          URL.revokeObjectURL(url);
-        }
+        this.erroCarregamento = r.mensagem;
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      this.appLog.log(`falha ao compartilhar: ${msg}`, 'erro');
+      this.erroCarregamento = `Falha ao gerar relatório: ${msg}`;
+      this.appLog.log(`falha ao gerar relatório: ${msg}`, 'erro');
     } finally {
       this.carregando = false;
+      this.cdr.detectChanges();
     }
   }
 
